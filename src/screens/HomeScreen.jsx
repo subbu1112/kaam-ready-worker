@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { sb } from '../lib/supabase'
+import MapView from '../components/MapView'
 const Y='#F5C000',YL='#FFF8D6',GREEN='#22c55e',RED='#ef4444'
 export default function HomeScreen({ user, profile, showToast }) {
   const [online,    setOnline]    = useState(false)
@@ -103,8 +104,9 @@ export default function HomeScreen({ user, profile, showToast }) {
                 <span style={{ fontSize:13, fontWeight:600, color:'#fff', maxWidth:'60%', textAlign:'right' }}>{v}</span>
               </div>
             ))}
-            <div style={{ display:'flex', gap:8, marginTop:12 }}>
-              <button onClick={() => showToast('🗺️ Opening Maps...')} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>🗺️ Navigate</button>
+            <MapView style={{ borderRadius:12, height:160, overflow:'hidden', marginTop:10 }} />
+            <div style={{ display:'flex', gap:8, marginTop:10 }}>
+              <button onClick={() => { const q=encodeURIComponent(activeJob.address||activeJob.city||'Karnataka'); window.open('https://www.google.com/maps/search/?api=1&query='+q,'_blank') }} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>🗺️ Navigate</button>
               <button onClick={() => showToast('📞 Calling...')} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>📞 Call</button>
             </div>
             <button onClick={completeJob} style={{ width:'100%', background:GREEN, color:'#fff', border:'none', borderRadius:14, padding:15, fontWeight:800, fontSize:14, cursor:'pointer', marginTop:10 }}>Mark as Completed ✓</button>
