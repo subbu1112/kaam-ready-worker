@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { sb } from '../lib/supabase'
+import AvatarUpload from '../components/AvatarUpload'
 const Y='#F5C000', YL='#FFF8D6', GREEN='#22c55e'
 
 const ACHIEVEMENTS = [
@@ -81,6 +82,7 @@ function BankModal({ profile, onClose, showToast }) {
 
 export default function ProfileScreen({ profile, showToast }) {
   const [modal, setModal] = useState(null)
+  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || null)
   const jobs   = profile?.total_jobs  || 0
   const rating = profile?.rating      || 5.0
   const trust  = profile?.trust_score || 60
@@ -100,7 +102,10 @@ export default function ProfileScreen({ profile, showToast }) {
       {modal==='bank'         && <BankModal profile={profile} onClose={() => setModal(null)} showToast={showToast} />}
 
       <div style={{ background:'#1C1C1E', padding:'32px 20px 24px', textAlign:'center', flexShrink:0 }}>
-        <div style={{ width:72, height:72, borderRadius:22, background:YL, display:'flex', alignItems:'center', justifyContent:'center', fontSize:38, margin:'0 auto 14px' }}>⚡</div>
+        <div style={{ marginBottom:14 }}>
+          <AvatarUpload userId={profile?.id} currentUrl={avatarUrl} table="workers" dark
+            onUploaded={url => setAvatarUrl(url)} />
+        </div>
         <p style={{ color:'#fff', fontWeight:800, fontSize:20 }}>{profile?.name||'Worker'}</p>
         <p style={{ color:'#636366', fontSize:13, marginTop:4 }}>{profile?.phone}</p>
         <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:12, flexWrap:'wrap' }}>

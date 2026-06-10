@@ -9,6 +9,7 @@ import EarningsScreen from './screens/EarningsScreen'
 import ProfileScreen  from './screens/ProfileScreen'
 import TabBar         from './components/TabBar'
 import Toast          from './components/Toast'
+import TermsModal, { termsAccepted, acceptTerms } from './components/TermsModal'
 
 export default function App() {
   const [screen,  setScreen]  = useState('login')
@@ -16,6 +17,7 @@ export default function App() {
   const [user,    setUser]    = useState(null)
   const [profile, setProfile] = useState(null)
   const [toast,   setToast]   = useState(null)
+  const [showTerms, setShowTerms] = useState(false)
 
   useEffect(() => {
     sb.auth.getSession().then(({ data }) => {
@@ -32,6 +34,7 @@ export default function App() {
     if (data) {
       setProfile(data)
       setScreen(data.onboarding_done ? 'main' : 'onboard')
+      if (!termsAccepted()) setShowTerms(true)
       // Set OneSignal tags so push notifications can target this worker by city
       try {
         await OneSignal.sendTags({ city: data.city || '', worker_id: uid, skill: data.skill || '' })
@@ -54,6 +57,7 @@ export default function App() {
       {tab==='earnings' && <EarningsScreen {...ctx} />}
       {tab==='profile'  && <ProfileScreen  {...ctx} />}
       <TabBar tab={tab} setTab={setTab} />
+      {showTerms && <TermsModal dark onAccept={() => { acceptTerms(); setShowTerms(false) }} />}
       {toast && <Toast msg={toast} />}
     </div>
   )
