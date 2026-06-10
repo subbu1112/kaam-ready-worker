@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { sb } from './lib/supabase'
+import OneSignal from 'react-onesignal'
 import LoginScreen    from './screens/LoginScreen'
 import OTPScreen      from './screens/OTPScreen'
 import OnboardScreen  from './screens/OnboardScreen'
@@ -28,8 +29,15 @@ export default function App() {
 
   async function loadProfile(uid) {
     const { data } = await sb.from('workers').select('*').eq('id', uid).single()
-    if (data) { setProfile(data); setScreen(data.onboarding_done?'main':'onboard') }
-    else setScreen('onboard')
+    if (data) {
+      setProfile(data)
+      setScreen(data.onboarding_done ? 'main' : 'onboard')
+      // Set OneSignal tags so push notifications can target this worker by city
+      try {
+        await OneSignal.sendTags({ city: data.city || '', worker_id: uid, skill: data.skill || '' })
+        await OneSignal.setExternalUserId(uid)
+      } catch(e) { console.warn('OneSignal tag error:', e) }
+    } else setScreen('onboard')
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(null), 2600) }
