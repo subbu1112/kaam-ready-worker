@@ -3,7 +3,7 @@ import { sb } from '../lib/supabase'
 import MapView from '../components/MapView'
 const Y='#F5C000',YL='#FFF8D6',GREEN='#22c55e',RED='#ef4444'
 export default function HomeScreen({ user, profile, showToast }) {
-  const [online,    setOnline]    = useState(false)
+  const [online,    setOnline]    = useState(() => localStorage.getItem('kr_worker_online') === 'true')
   const [jobAlert,  setJobAlert]  = useState(null)
   const [activeJob, setActiveJob] = useState(null)
   const [todayEarn, setTodayEarn] = useState(0)
@@ -15,6 +15,11 @@ export default function HomeScreen({ user, profile, showToast }) {
     else { if(chan.current) sb.removeChannel(chan.current); clearTimeout(timer.current); setJobAlert(null) }
     return () => { if(chan.current) sb.removeChannel(chan.current) }
   }, [online])
+  useEffect(() => {
+    if (!user?.id) return
+    sb.from('workers').update({ is_online: online }).eq('id', user.id).then(() => {})
+    localStorage.setItem('kr_worker_online', online)
+  }, [online, user?.id])
   async function loadTodayStats() {
     if(!user) return
     const today=new Date().toISOString().slice(0,10)
