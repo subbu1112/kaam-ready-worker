@@ -15,6 +15,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
   const [primary,  setPrimary]  = useState('')
   const [upiId,    setUpiId]    = useState('')
   const [refCode,  setRefCode]  = useState('')
+  const [idType,   setIdType]   = useState('aadhaar')
   const [aaFront,  setAaFront]  = useState(null)  // File object
   const [aaBack,   setAaBack]   = useState(null)
   const [aaPreF,   setAaPreF]   = useState(null)  // Preview URL
@@ -56,7 +57,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
 
   async function finish() {
     if (!name || !phone || !city || skills.length===0) { showToast('Fill in all required fields'); return }
-    if (!aaFront || !aaBack) { showToast('Please upload both sides of Aadhaar'); return }
+    if (!aaFront || !aaBack) { showToast('Please upload both sides of your ID'); return }
     setBusy(true)
     try {
       // Upload Aadhaar first
@@ -65,7 +66,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
       const { data, error } = await sb.from('workers').upsert({
         id: user.id, name, phone, city, address, skill: sk, skills,
         onboarding_done: true, trust_score: 60,
-        aadhar_submitted: kycDone, aadhar_verified: false,
+        aadhar_submitted: kycDone, aadhar_verified: false, id_doc_type: idType,
         upi_id: upiId.trim(), price_min: floorFor(sk),
         referral_code: 'KR'+phone.slice(-4)+Math.floor(10+Math.random()*89),
         referred_by: refCode.trim() || null,
@@ -73,7 +74,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
       if (error) { showToast(error.message); return }
       setProfile(data)
       setScreen('main')
-      showToast('Welcome to Kaam Ready! 👷 Your Aadhaar is under review.')
+      showToast('Welcome to Kaam Ready! 👷 Your ID is under review.')
     } catch(e) {
       showToast('Error: ' + e.message)
     } finally {
@@ -81,7 +82,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
     }
   }
 
-  const STEPS = ['Personal Details', 'Your Skills', 'Pricing & UPI', 'Aadhaar KYC']
+  const STEPS = ['Personal Details', 'Your Skills', 'Pricing & UPI', 'ID Verification']
 
   return (
     <div style={{ height:'100vh', background:'#F2F2F7', maxWidth:430, margin:'0 auto', width:'100%', display:'flex', flexDirection:'column' }}>
@@ -185,13 +186,23 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
         {/* Step 3 — Aadhaar KYC */}
         {step===3 && (
           <div style={{ background:'#fff', borderRadius:20, padding:20, border:'1px solid #eee' }}>
-            <p style={{ fontWeight:800, fontSize:17, marginBottom:6 }}>🛡️ Aadhaar Verification</p>
-            <p style={{ fontSize:13, color:'#888', marginBottom:16 }}>Required for worker safety. Your Aadhaar is encrypted and only reviewed by our admin team.</p>
+            <p style={{ fontWeight:800, fontSize:17, marginBottom:6 }}>🛡️ Identity Verification</p>
+            <p style={{ fontSize:13, color:'#888', marginBottom:12 }}>Upload any one government ID. It is stored privately and reviewed only by our admin team — never shown to customers.</p>
+            <div style={{ marginBottom:16 }}>
+              <label style={{ fontSize:12, fontWeight:700, color:'#555', display:'block', marginBottom:6 }}>ID TYPE</label>
+              <select value={idType} onChange={e => setIdType(e.target.value)}
+                style={{ width:'100%', border:'1.5px solid #E5E5EA', borderRadius:12, padding:13, fontSize:14, outline:'none', fontFamily:'inherit', background:'#fff' }}>
+                <option value="aadhaar">Aadhaar (mask the first 8 digits)</option>
+                <option value="voter">Voter ID</option>
+                <option value="dl">Driving Licence</option>
+              </select>
+              {idType==='aadhaar' && <p style={{ fontSize:11, color:'#B8900A', marginTop:6 }}>Tip: cover the first 8 digits of your Aadhaar number with a finger or paper when photographing — we only need your name and photo visible.</p>}
+            </div>
 
             {[['Front Side', aaFront, aaPreF, f => setAaFront(f), p => setAaPreF(p)],
               ['Back Side',  aaBack,  aaPreB, f => setAaBack(f),  p => setAaPreB(p)]].map(([label, file, prev, setFile, setPrev]) => (
               <div key={label} style={{ marginBottom:16 }}>
-                <label style={{ fontSize:12, fontWeight:700, color:'#555', display:'block', marginBottom:8 }}>AADHAAR {label.toUpperCase()}</label>
+                <label style={{ fontSize:12, fontWeight:700, color:'#555', display:'block', marginBottom:8 }}>ID {label.toUpperCase()}</label>
                 {prev ? (
                   <div style={{ position:'relative' }}>
                     <img src={prev} alt={label} style={{ width:'100%', height:160, objectFit:'cover', borderRadius:12, border:'2px solid #22c55e' }} />
@@ -204,7 +215,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
                   <label style={{ display:'block', border:'2px dashed #E5E5EA', borderRadius:12, padding:'28px 20px', textAlign:'center', cursor:'pointer', background:'#fafafa' }}>
                     <div style={{ fontSize:32, marginBottom:8 }}>📷</div>
                     <p style={{ fontSize:13, fontWeight:600, color:'#555' }}>Tap to take photo or upload</p>
-                    <p style={{ fontSize:11, color:'#aaa', marginTop:4 }}>{label} of Aadhaar card</p>
+                    <p style={{ fontSize:11, color:'#aaa', marginTop:4 }}>{label} of your ID</p>
                     <input type="file" accept="image/*" capture="environment" style={{ display:'none' }}
                       onChange={e => pickFile(e, setFile, setPrev)} />
                   </label>
@@ -213,7 +224,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
             ))}
             <div style={{ background:'#FFF8D6', borderRadius:12, padding:'10px 14px', display:'flex', gap:8, alignItems:'flex-start' }}>
               <span style={{ fontSize:16 }}>🔒</span>
-              <p style={{ fontSize:12, color:'#666', flex:1 }}>Your Aadhaar details are stored securely and never shared publicly. Verification takes 24 hours.</p>
+              <p style={{ fontSize:12, color:'#666', flex:1 }}>Your ID is stored securely and never shared publicly. Verification takes 24 hours.</p>
             </div>
           </div>
         )}
