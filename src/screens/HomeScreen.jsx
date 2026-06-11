@@ -60,11 +60,30 @@ export default function HomeScreen({ user, profile, showToast }) {
       .order('created_at',{ascending:false}).limit(1)
       .then(({ data }) => { if (data?.[0]) { setJobAlert(prev => prev || data[0]); showToast('A job is waiting! 🔔') } })
   }
+  function getPosition() {
+    return new Promise(res => {
+      if (!navigator.geolocation) return res(null)
+      navigator.geolocation.getCurrentPosition(
+        pos => res({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        ()  => res(null), { enableHighAccuracy: true, timeout: 5000 })
+    })
+  }
   async function acceptJob() {
     if(!jobAlert) return
-    const w={id:user.id,name:profile?.name,skill:profile?.skill,rating:profile?.rating,jobs:profile?.total_jobs,ico:'👷',eta:'8 min',dist:'1.0 km'}
+    const pos = await getPosition()
+    if (pos) sb.from('workers').update({ lat: pos.lat, lng: pos.lng }).eq('id', user.id).then(()=>{})
+    const w={id:user.id,name:profile?.name,skill:profile?.skill,rating:profile?.rating,jobs:profile?.total_jobs,ico:'👷',eta:'8 min',dist:'1.0 km',lat:pos?.lat,lng:pos?.lng}
     await sb.from('bookings').update({status:'assigned',worker_id:user.id,worker:w}).eq('id',jobAlert.id)
     setActiveJob({...jobAlert,status:'assigned',worker:w}); setJobAlert(null); showToast('Job accepted! Navigate to customer 🗺️')
+  }
+  function navigateToCustomer() {
+    const j = activeJob
+    if (j?.address_lat && j?.address_lng)
+      window.open('https://www.google.com/maps/dir/?api=1&destination='+j.address_lat+','+j.address_lng, '_blank')
+    else {
+      const q = encodeURIComponent(j?.address || j?.city || 'Karnataka')
+      window.open('https://www.google.com/maps/dir/?api=1&destination='+q, '_blank')
+    }
   }
   function jobFloor(job) { return floorFor(job?.service_id) }
   async function submitPrice() {
@@ -163,17 +182,22 @@ export default function HomeScreen({ user, profile, showToast }) {
                 {activeJob.payment_status==='claimed' ? 'Payment Sent' : activeJob.status==='priced' ? 'Awaiting Payment' : 'In Progress'}
               </span>
             </div>
-            {[['Service',activeJob.service],['Address',activeJob.address]].map(([k,v]) => (
+            {[['Customer',activeJob.customer_name||'—'],['Service',activeJob.service],['Address',activeJob.address]].map(([k,v]) => (
               <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #1a1a1a' }}>
                 <span style={{ fontSize:13, color:'#636366' }}>{k}</span>
                 <span style={{ fontSize:13, fontWeight:600, color:'#fff', maxWidth:'60%', textAlign:'right' }}>{v}</span>
               </div>
             ))}
             {activeJob.status!=='priced' && !activeJob.payment_status && <>
-              <MapView style={{ borderRadius:12, height:160, overflow:'hidden', marginTop:10 }} />
+              <MapView
+                customerLat={activeJob.address_lat} customerLng={activeJob.address_lng}
+                workerLat={activeJob.worker?.lat || profile?.lat} workerLng={activeJob.worker?.lng || profile?.lng}
+                style={{ borderRadius:12, height:160, overflow:'hidden', marginTop:10 }} />
               <div style={{ display:'flex', gap:8, marginTop:10 }}>
-                <button onClick={() => { const q=encodeURIComponent(activeJob.address||activeJob.city||'Karnataka'); window.open('https://www.google.com/maps/search/?api=1&query='+q,'_blank') }} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>🗺️ Navigate</button>
-                <button onClick={() => showToast('📞 Calling...')} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>📞 Call</button>
+                <button onClick={navigateToCustomer} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>🗺️ Directions</button>
+                {activeJob.customer_phone
+                  ? <a href={'tel:+91'+activeJob.customer_phone} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer', textAlign:'center', textDecoration:'none', color:'#000' }}>📞 Call Customer</a>
+                  : <button onClick={() => showToast('Customer phone not available for this booking')} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>📞 Call</button>}
               </div>
             </>}
             {activeJob.status!=='priced' && !showPrice && (
