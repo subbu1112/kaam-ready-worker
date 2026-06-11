@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { sb } from '../lib/supabase'
 import AvatarUpload from '../components/AvatarUpload'
 import { floorFor } from '../constants'
+import { getLang, setLang } from '../i18n'
 const Y='#F5C000', YL='#FFF8D6', GREEN='#22c55e'
 
 const ACHIEVEMENTS = [
@@ -92,7 +93,19 @@ export default function ProfileScreen({ profile, showToast }) {
   const trust  = profile?.trust_score || 60
   const earned = ACHIEVEMENTS.filter(a => a.threshold(jobs, rating, trust)).length
 
+  function toggleLang() {
+    setLang(getLang()==='kn' ? 'en' : 'kn')
+    window.location.reload()
+  }
+  function copyReferral() {
+    const code = profile?.referral_code || ('KR'+(profile?.phone||'').slice(-4))
+    navigator.clipboard?.writeText(code)
+    showToast('Referral code copied: '+code+' — friend enters it at signup, you earn ₹100 after their 5th job!')
+  }
+
   const menus = [
+    ['🌐', getLang()==='kn' ? 'Language: ಕನ್ನಡ' : 'Language: English', getLang()==='kn' ? 'EN?' : 'ಕನ್ನಡ?', toggleLang],
+    ['🎁','Refer & Earn ₹100', profile?.referral_code || ('KR'+(profile?.phone||'').slice(-4)), copyReferral],
     ['📋','Job History',    null,     () => showToast('Coming soon!')],
     ['🏆','Achievements',  earned+' earned', () => setModal('achievements')],
     ['💳','Payments & Pricing',  profile?.upi_id ? '✓ Set' : 'Add UPI', () => setModal('bank')],

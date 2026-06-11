@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { sb } from '../lib/supabase'
 import MapView from '../components/MapView'
 import { floorFor, COMMISSION } from '../constants'
+import { t } from '../i18n'
 const Y='#F5C000',YL='#FFF8D6',GREEN='#22c55e',RED='#ef4444'
 export default function HomeScreen({ user, profile, showToast }) {
   const [online,    setOnline]    = useState(() => localStorage.getItem('kr_worker_online') === 'true')
@@ -13,14 +14,20 @@ export default function HomeScreen({ user, profile, showToast }) {
   const [price,     setPrice]     = useState('')
   const [note,      setNote]      = useState('')
   const [busy,      setBusy]      = useState(false)
+  const [upcoming,  setUpcoming]  = useState([])   // my accepted scheduled jobs
+  const [schedAvail,setSchedAvail]= useState([])   // scheduled jobs anyone can take
+  const [photoBusy, setPhotoBusy] = useState(null)
   const timer=useRef(null), chan=useRef(null), jobChan=useRef(null)
   useEffect(() => { if(profile) loadTodayStats() }, [profile])
   // Restore an in-progress job after refresh
   useEffect(() => {
     if (!user?.id) return
     sb.from('bookings').select('*').eq('worker_id', user.id)
-      .in('status', ['assigned','priced']).order('created_at', { ascending:false }).limit(1)
-      .then(({ data }) => { if (data?.[0]) setActiveJob(prev => prev || data[0]) })
+      .in('status', ['assigned','priced']).order('created_at', { ascending:false }).limit(3)
+      .then(({ data }) => {
+        const j = (data||[]).find(b => !(b.is_scheduled && b.scheduled_at && new Date(b.scheduled_at) > new Date(Date.now()+15*60*1000)))
+        if (j) setActiveJob(prev => prev || j)
+      })
   }, [user?.id])
   useEffect(() => {
     if(online) subscribeToJobs()
@@ -49,16 +56,70 @@ export default function HomeScreen({ user, profile, showToast }) {
     const { data } = await sb.from('bookings').select('amount').eq('worker_id',user.id).eq('status','completed').gte('created_at',today)
     if(data) { setTodayJobs(data.length); setTodayEarn(data.reduce((s,b)=>s+(b.amount||0),0)) }
   }
+  function kmBetween(lat1,lng1,lat2,lng2) {
+    if (!lat1||!lng1||!lat2||!lng2) return null
+    const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLng=(lng2-lng1)*Math.PI/180
+    const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
+  }
+  // Nearest workers get the alert first; farther workers see it only if still unclaimed
+  function offerJob(b) {
+    if (b.city !== profile?.city) return
+    let delay = 0
+    if (b.preferred_worker_id && b.preferred_worker_id !== user.id) delay = 60000  // preferred worker gets 60s head start
+    else if (b.preferred_worker_id === user.id) delay = 0
+    else {
+      const d = kmBetween(profile?.lat, profile?.lng, b.address_lat, b.address_lng)
+      if (d !== null) delay = d <= 5 ? 0 : d <= 10 ? 20000 : 45000
+    }
+    const show = async () => {
+      if (delay > 0) {  // re-check it wasn't taken meanwhile
+        const { data } = await sb.from('bookings').select('status').eq('id', b.id).single()
+        if (data?.status !== 'searching') return
+      }
+      setJobAlert(prev => prev || b)
+      showToast(b.preferred_worker_id===user.id ? 'A customer requested YOU! ⭐' : 'New job request! 🔔')
+    }
+    delay === 0 ? show() : setTimeout(show, delay)
+  }
   function subscribeToJobs() {
     chan.current = sb.channel('new-jobs-'+profile?.city)
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'bookings',filter:'status=eq.searching'},payload=>{
-        if(payload.new.city===profile?.city) { setJobAlert(payload.new); showToast('New job request! 🔔') }
-      }).subscribe()
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'bookings',filter:'status=eq.searching'},payload=>offerJob(payload.new))
+      .subscribe()
     // Also pick up jobs that were already waiting before we came online
     sb.from('bookings').select('*').eq('status','searching').eq('city', profile?.city)
       .gte('created_at', new Date(Date.now()-3*60*1000).toISOString())
       .order('created_at',{ascending:false}).limit(1)
-      .then(({ data }) => { if (data?.[0]) { setJobAlert(prev => prev || data[0]); showToast('A job is waiting! 🔔') } })
+      .then(({ data }) => { if (data?.[0]) offerJob(data[0]) })
+    loadScheduled()
+  }
+  async function loadScheduled() {
+    const [avail, mine] = await Promise.all([
+      sb.from('bookings').select('*').eq('status','scheduled').is('worker_id', null).eq('city', profile?.city).gte('scheduled_at', new Date().toISOString()).order('scheduled_at').limit(5),
+      sb.from('bookings').select('*').eq('worker_id', user.id).eq('is_scheduled', true).eq('status','assigned').gte('scheduled_at', new Date(Date.now()-30*60*1000).toISOString()).order('scheduled_at').limit(5),
+    ])
+    setSchedAvail(avail.data || [])
+    setUpcoming(mine.data || [])
+  }
+  async function acceptScheduled(b) {
+    const { error } = await sb.from('bookings').update({ worker_id: user.id, status:'assigned', worker:{ id:user.id, name:profile?.name, skill:profile?.skill, rating:profile?.rating, ico:'👷' } }).eq('id', b.id).is('worker_id', null)
+    if (error) { showToast(error.message); return }
+    showToast('Scheduled job is yours ✓ 📅')
+    loadScheduled()
+  }
+  async function uploadJobPhoto(which, file) {
+    if (!activeJob || !file) return
+    setPhotoBusy(which)
+    const path = `${activeJob.id}/${which}.jpg`
+    const { error } = await sb.storage.from('job-photos').upload(path, file, { upsert: true })
+    if (!error) {
+      const { data: pub } = sb.storage.from('job-photos').getPublicUrl(path)
+      const col = which==='before' ? 'photo_before_url' : 'photo_after_url'
+      await sb.from('bookings').update({ [col]: pub.publicUrl }).eq('id', activeJob.id)
+      setActiveJob(prev => ({ ...prev, [col]: pub.publicUrl }))
+      showToast('Photo saved ✓')
+    } else showToast(error.message)
+    setPhotoBusy(null)
   }
   function getPosition() {
     return new Promise(res => {
@@ -127,7 +188,7 @@ export default function HomeScreen({ user, profile, showToast }) {
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <div style={{ background:online?GREEN:'#1C1C1E', padding:'10px 20px 6px', display:'flex', justifyContent:'space-between', transition:'background .3s' }}>
         <span style={{ color:'#fff', fontSize:12, fontWeight:700 }}>Kaam Ready</span>
-        <span style={{ color:'#fff', fontSize:11, fontWeight:800 }}>{online?'● ONLINE':'● OFFLINE'}</span>
+        <span style={{ color:'#fff', fontSize:11, fontWeight:800 }}>{online?'● '+t('ONLINE'):'● '+t('OFFLINE')}</span>
         <span style={{ color:'#fff', fontSize:12 }}>📶 🔋</span>
       </div>
       <div style={{ background:'#1C1C1E', padding:'10px 20px 16px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
@@ -143,21 +204,53 @@ export default function HomeScreen({ user, profile, showToast }) {
         {!online && !activeJob && (
           <div style={{ background:'#111', borderRadius:20, padding:'28px 24px', textAlign:'center', border:'1.5px dashed #2a2a2a' }}>
             <div style={{ fontSize:44, marginBottom:12 }}>😴</div>
-            <p style={{ fontWeight:800, fontSize:16, color:'#fff' }}>You are Offline</p>
+            <p style={{ fontWeight:800, fontSize:16, color:'#fff' }}>{t('You are Offline')}</p>
             <p style={{ fontSize:13, color:'#555', margin:'6px 0 18px' }}>Toggle the switch above to start receiving jobs</p>
-            <button onClick={toggleOnline} style={{ background:Y, border:'none', borderRadius:14, padding:'14px 28px', fontWeight:800, fontSize:14, cursor:'pointer' }}>Go Online Now</button>
+            <button onClick={toggleOnline} style={{ background:Y, border:'none', borderRadius:14, padding:'14px 28px', fontWeight:800, fontSize:14, cursor:'pointer' }}>{t('Go Online Now')}</button>
           </div>
         )}
         {online && !jobAlert && !activeJob && (
           <div style={{ background:'#111', border:'1.5px solid '+Y, borderRadius:20, padding:'28px 24px', textAlign:'center' }}>
             <div style={{ fontSize:44, marginBottom:12, animation:'float 1.5s ease-in-out infinite' }}>🟢</div>
-            <p style={{ fontWeight:800, fontSize:16, color:'#fff' }}>Waiting for jobs...</p>
+            <p style={{ fontWeight:800, fontSize:16, color:'#fff' }}>{t('Waiting for jobs...')}</p>
             <p style={{ fontSize:13, color:'#636366', marginTop:6 }}>You'll be notified instantly when a job matches</p>
+          </div>
+        )}
+        {online && upcoming.length>0 && (
+          <div style={{ background:'#111', border:'1.5px solid #5B21B6', borderRadius:20, padding:16 }}>
+            <p style={{ color:'#a78bfa', fontWeight:800, fontSize:14, marginBottom:10 }}>📅 {t('Upcoming Jobs')}</p>
+            {upcoming.map(b => (
+              <div key={b.id} style={{ borderTop:'1px solid #1a1a1a', padding:'10px 0' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div>
+                    <p style={{ color:'#fff', fontSize:13, fontWeight:700 }}>{b.service} · {b.customer_name||''}</p>
+                    <p style={{ color:'#636366', fontSize:11, marginTop:2 }}>{new Date(b.scheduled_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})} · {b.address}</p>
+                  </div>
+                  <button onClick={() => setActiveJob(b)}
+                    style={{ background:Y, border:'none', borderRadius:10, padding:'8px 14px', fontWeight:800, fontSize:12, cursor:'pointer', flexShrink:0 }}>{t('Start Job')}</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {online && !activeJob && schedAvail.length>0 && (
+          <div style={{ background:'#111', border:'1.5px dashed #5B21B6', borderRadius:20, padding:16 }}>
+            <p style={{ color:'#a78bfa', fontWeight:800, fontSize:14, marginBottom:10 }}>📅 {t('Scheduled Jobs Available')}</p>
+            {schedAvail.map(b => (
+              <div key={b.id} style={{ borderTop:'1px solid #1a1a1a', padding:'10px 0', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <div>
+                  <p style={{ color:'#fff', fontSize:13, fontWeight:700 }}>{b.service}</p>
+                  <p style={{ color:'#636366', fontSize:11, marginTop:2 }}>{new Date(b.scheduled_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</p>
+                </div>
+                <button onClick={() => acceptScheduled(b)}
+                  style={{ background:'#22c55e', color:'#fff', border:'none', borderRadius:10, padding:'8px 14px', fontWeight:800, fontSize:12, cursor:'pointer', flexShrink:0 }}>✓ {t('Accept')}</button>
+              </div>
+            ))}
           </div>
         )}
         {jobAlert && (
           <div style={{ background:'#1C1C1E', borderRadius:20, padding:16, border:'2px solid '+Y, animation:'popIn .3s ease' }}>
-            <h3 style={{ color:Y, fontWeight:800, fontSize:15, marginBottom:12 }}>🔔 New Job Request!</h3>
+            <h3 style={{ color:Y, fontWeight:800, fontSize:15, marginBottom:12 }}>🔔 {t('New Job Request!')}</h3>
             {[['Service',jobAlert.service],['Address',jobAlert.address],['City',jobAlert.city]].map(([k,v]) => (
               <div key={k} style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
                 <span style={{ color:'#636366', fontSize:12 }}>{k}</span>
@@ -165,21 +258,21 @@ export default function HomeScreen({ user, profile, showToast }) {
               </div>
             ))}
             <div style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}>
-              <span style={{ color:'#636366', fontSize:12 }}>Starting price</span>
+              <span style={{ color:'#636366', fontSize:12 }}>{t('Starting price')}</span>
               <span style={{ color:Y, fontSize:18, fontWeight:800 }}>from ₹{jobFloor(jobAlert)}</span>
             </div>
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={acceptJob} style={{ flex:1, background:GREEN, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer' }}>✓ Accept</button>
-              <button onClick={() => setJobAlert(null)} style={{ flex:1, background:RED, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer' }}>✕ Decline</button>
+              <button onClick={acceptJob} style={{ flex:1, background:GREEN, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer' }}>✓ {t('Accept')}</button>
+              <button onClick={() => setJobAlert(null)} style={{ flex:1, background:RED, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer' }}>✕ {t('Decline')}</button>
             </div>
           </div>
         )}
         {activeJob && (
           <div style={{ background:'#111', borderRadius:20, padding:16, border:'2px solid '+GREEN }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-              <p style={{ fontWeight:800, fontSize:14, color:'#fff' }}>🔧 Active Job</p>
+              <p style={{ fontWeight:800, fontSize:14, color:'#fff' }}>🔧 {t('Active Job')}</p>
               <span style={{ background:'#D1FAE5', color:'#065F46', fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:8 }}>
-                {activeJob.payment_status==='claimed' ? 'Payment Sent' : activeJob.status==='priced' ? 'Awaiting Payment' : 'In Progress'}
+                {activeJob.payment_status==='claimed' ? t('Payment Sent') : activeJob.status==='priced' ? t('Awaiting Payment') : t('In Progress')}
               </span>
             </div>
             {[['Customer',activeJob.customer_name||'—'],['Service',activeJob.service],['Address',activeJob.address]].map(([k,v]) => (
@@ -194,14 +287,25 @@ export default function HomeScreen({ user, profile, showToast }) {
                 workerLat={activeJob.worker?.lat || profile?.lat} workerLng={activeJob.worker?.lng || profile?.lng}
                 style={{ borderRadius:12, height:160, overflow:'hidden', marginTop:10 }} />
               <div style={{ display:'flex', gap:8, marginTop:10 }}>
-                <button onClick={navigateToCustomer} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>🗺️ Directions</button>
+                <button onClick={navigateToCustomer} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>🗺️ {t('Directions')}</button>
                 {activeJob.customer_phone
-                  ? <a href={'tel:+91'+activeJob.customer_phone} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer', textAlign:'center', textDecoration:'none', color:'#000' }}>📞 Call Customer</a>
+                  ? <a href={'tel:+91'+activeJob.customer_phone} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer', textAlign:'center', textDecoration:'none', color:'#000' }}>📞 {t('Call Customer')}</a>
                   : <button onClick={() => showToast('Customer phone not available for this booking')} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>📞 Call</button>}
               </div>
             </>}
+            {activeJob.status!=='priced' && !activeJob.payment_status && (
+              <div style={{ display:'flex', gap:8, marginTop:10 }}>
+                {[['before', activeJob.photo_before_url],['after', activeJob.photo_after_url]].map(([which, url]) => (
+                  <label key={which} style={{ flex:1, background: url ? '#0d2818' : '#1C1C1E', border:'1px solid '+(url?GREEN:'#2a2a2a'), borderRadius:12, padding:10, textAlign:'center', cursor:'pointer', fontSize:12, fontWeight:700, color: url ? '#4ade80' : '#888' }}>
+                    {photoBusy===which ? '...' : (url ? '✓ ' : '📷 ')+t(which==='before'?'Before':'After')}
+                    <input type="file" accept="image/*" capture="environment" style={{ display:'none' }}
+                      onChange={e => uploadJobPhoto(which, e.target.files[0])} />
+                  </label>
+                ))}
+              </div>
+            )}
             {activeJob.status!=='priced' && !showPrice && (
-              <button onClick={() => { setPrice(''); setNote(''); setShowPrice(true) }} style={{ width:'100%', background:GREEN, color:'#fff', border:'none', borderRadius:14, padding:15, fontWeight:800, fontSize:14, cursor:'pointer', marginTop:10 }}>Work Done — Set Final Price ₹</button>
+              <button onClick={() => { setPrice(''); setNote(''); setShowPrice(true) }} style={{ width:'100%', background:GREEN, color:'#fff', border:'none', borderRadius:14, padding:15, fontWeight:800, fontSize:14, cursor:'pointer', marginTop:10 }}>{t('Work Done — Set Final Price ₹')}</button>
             )}
             {activeJob.status!=='priced' && showPrice && (
               <div style={{ background:'#1C1C1E', borderRadius:14, padding:14, marginTop:10 }}>
@@ -213,7 +317,7 @@ export default function HomeScreen({ user, profile, showToast }) {
                   style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:12, fontSize:13, color:'#fff', outline:'none', fontFamily:'inherit', marginBottom:10 }} />
                 <div style={{ display:'flex', gap:8 }}>
                   <button onClick={() => setShowPrice(false)} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:10, padding:12, fontWeight:700, fontSize:13, cursor:'pointer' }}>Cancel</button>
-                  <button onClick={submitPrice} disabled={busy} style={{ flex:2, background:Y, border:'none', borderRadius:10, padding:12, fontWeight:800, fontSize:13, cursor:'pointer', opacity:busy?.6:1 }}>{busy?'Sending...':'Send to Customer →'}</button>
+                  <button onClick={submitPrice} disabled={busy} style={{ flex:2, background:Y, border:'none', borderRadius:10, padding:12, fontWeight:800, fontSize:13, cursor:'pointer', opacity:busy?.6:1 }}>{busy?'...':t('Send to Customer →')}</button>
                 </div>
               </div>
             )}
@@ -232,14 +336,14 @@ export default function HomeScreen({ user, profile, showToast }) {
                 <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>Customer paid ₹{activeJob.amount} via UPI</p>
                 <p style={{ color:'#9ca3af', fontSize:12, margin:'4px 0 12px' }}>Check your UPI app, then confirm below</p>
                 <button onClick={confirmPayment} disabled={busy} style={{ width:'100%', background:GREEN, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer', opacity:busy?.6:1 }}>
-                  {busy?'Confirming...':'✓ Confirm Payment Received'}
+                  {busy?'...':t('✓ Confirm Payment Received')}
                 </button>
               </div>
             )}
           </div>
         )}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
-          {[['₹'+todayEarn.toLocaleString('en-IN'),'Today'],[todayJobs,'Jobs done'],[(profile?.rating||5.0)+'⭐','Rating']].map(([v,l]) => (
+          {[['₹'+todayEarn.toLocaleString('en-IN'),t('Today')],[todayJobs,t('Jobs done')],[(profile?.rating||5.0)+'⭐',t('Rating')]].map(([v,l]) => (
             <div key={l} style={{ background:YL, borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
               <div style={{ fontSize:17, fontWeight:800 }}>{v}</div>
               <div style={{ fontSize:10, color:'#888', marginTop:2 }}>{l}</div>

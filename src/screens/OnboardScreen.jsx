@@ -14,6 +14,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
   const [skills,   setSkills]   = useState([])
   const [primary,  setPrimary]  = useState('')
   const [upiId,    setUpiId]    = useState('')
+  const [refCode,  setRefCode]  = useState('')
   const [aaFront,  setAaFront]  = useState(null)  // File object
   const [aaBack,   setAaBack]   = useState(null)
   const [aaPreF,   setAaPreF]   = useState(null)  // Preview URL
@@ -66,6 +67,8 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
         onboarding_done: true, trust_score: 60,
         aadhar_submitted: kycDone, aadhar_verified: false,
         upi_id: upiId.trim(), price_min: floorFor(sk),
+        referral_code: 'KR'+phone.slice(-4)+Math.floor(10+Math.random()*89),
+        referred_by: refCode.trim() || null,
       }).select().single()
       if (error) { showToast(error.message); return }
       setProfile(data)
@@ -112,10 +115,16 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
                 {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            <div>
+            <div style={{ marginBottom:14 }}>
               <label style={{ fontSize:12, fontWeight:700, color:'#555', display:'block', marginBottom:6 }}>HOME ADDRESS</label>
               <input value={address} onChange={e => setAddress(e.target.value)}
                 placeholder="e.g. 12, MG Road, Bengaluru"
+                style={{ width:'100%', border:'1.5px solid #E5E5EA', borderRadius:12, padding:'13px', fontSize:14, outline:'none', fontFamily:'inherit' }} />
+            </div>
+            <div>
+              <label style={{ fontSize:12, fontWeight:700, color:'#555', display:'block', marginBottom:6 }}>REFERRAL CODE (OPTIONAL)</label>
+              <input value={refCode} onChange={e => setRefCode(e.target.value.toUpperCase())}
+                placeholder="Got a code from a friend?"
                 style={{ width:'100%', border:'1.5px solid #E5E5EA', borderRadius:12, padding:'13px', fontSize:14, outline:'none', fontFamily:'inherit' }} />
             </div>
           </div>
