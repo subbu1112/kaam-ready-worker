@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { sb } from '../lib/supabase'
 import MapView from '../components/MapView'
-import { floorFor, topFor, COMMISSION } from '../constants'
+import { floorFor, COMMISSION } from '../constants'
 const Y='#F5C000',YL='#FFF8D6',GREEN='#22c55e',RED='#ef4444'
 export default function HomeScreen({ user, profile, showToast }) {
   const [online,    setOnline]    = useState(() => localStorage.getItem('kr_worker_online') === 'true')
@@ -15,6 +15,13 @@ export default function HomeScreen({ user, profile, showToast }) {
   const [busy,      setBusy]      = useState(false)
   const timer=useRef(null), chan=useRef(null), jobChan=useRef(null)
   useEffect(() => { if(profile) loadTodayStats() }, [profile])
+  // Restore an in-progress job after refresh
+  useEffect(() => {
+    if (!user?.id) return
+    sb.from('bookings').select('*').eq('worker_id', user.id)
+      .in('status', ['assigned','priced']).order('created_at', { ascending:false }).limit(1)
+      .then(({ data }) => { if (data?.[0]) setActiveJob(prev => prev || data[0]) })
+  }, [user?.id])
   useEffect(() => {
     if(online) subscribeToJobs()
     else { if(chan.current) sb.removeChannel(chan.current); clearTimeout(timer.current); setJobAlert(null) }
@@ -47,6 +54,11 @@ export default function HomeScreen({ user, profile, showToast }) {
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'bookings',filter:'status=eq.searching'},payload=>{
         if(payload.new.city===profile?.city) { setJobAlert(payload.new); showToast('New job request! 🔔') }
       }).subscribe()
+    // Also pick up jobs that were already waiting before we came online
+    sb.from('bookings').select('*').eq('status','searching').eq('city', profile?.city)
+      .gte('created_at', new Date(Date.now()-3*60*1000).toISOString())
+      .order('created_at',{ascending:false}).limit(1)
+      .then(({ data }) => { if (data?.[0]) { setJobAlert(prev => prev || data[0]); showToast('A job is waiting! 🔔') } })
   }
   async function acceptJob() {
     if(!jobAlert) return
@@ -55,13 +67,11 @@ export default function HomeScreen({ user, profile, showToast }) {
     setActiveJob({...jobAlert,status:'assigned',worker:w}); setJobAlert(null); showToast('Job accepted! Navigate to customer 🗺️')
   }
   function jobFloor(job) { return floorFor(job?.service_id) }
-  function jobMax(job)   { return profile?.price_max || topFor(job?.service_id) }
   async function submitPrice() {
     if(!activeJob || busy) return
     const p = parseInt(price, 10)
-    const floor = jobFloor(activeJob), max = jobMax(activeJob)
+    const floor = jobFloor(activeJob)
     if (!p || p < floor) { showToast(`Price can't be below the ₹${floor} minimum`); return }
-    if (p > max)         { showToast(`Price can't exceed your max of ₹${max}`); return }
     setBusy(true)
     const { error } = await sb.from('bookings').update({
       status:'priced', amount:p, price_note:note.trim()||null, priced_at:new Date().toISOString(),
@@ -136,8 +146,8 @@ export default function HomeScreen({ user, profile, showToast }) {
               </div>
             ))}
             <div style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}>
-              <span style={{ color:'#636366', fontSize:12 }}>Price range</span>
-              <span style={{ color:Y, fontSize:18, fontWeight:800 }}>₹{jobFloor(jobAlert)} – ₹{jobMax(jobAlert)}</span>
+              <span style={{ color:'#636366', fontSize:12 }}>Starting price</span>
+              <span style={{ color:Y, fontSize:18, fontWeight:800 }}>from ₹{jobFloor(jobAlert)}</span>
             </div>
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={acceptJob} style={{ flex:1, background:GREEN, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer' }}>✓ Accept</button>
@@ -172,7 +182,7 @@ export default function HomeScreen({ user, profile, showToast }) {
             {activeJob.status!=='priced' && showPrice && (
               <div style={{ background:'#1C1C1E', borderRadius:14, padding:14, marginTop:10 }}>
                 <p style={{ color:Y, fontWeight:800, fontSize:13, marginBottom:4 }}>Final Price</p>
-                <p style={{ color:'#636366', fontSize:11, marginBottom:10 }}>Allowed: ₹{jobFloor(activeJob)} (fixed minimum) – ₹{jobMax(activeJob)} (your max)</p>
+                <p style={{ color:'#636366', fontSize:11, marginBottom:10 }}>Minimum: ₹{jobFloor(activeJob)} — price the job fairly, the customer approves it before paying</p>
                 <input value={price} onChange={e => setPrice(e.target.value.replace(/\D/g,'').slice(0,5))} type="tel" placeholder="₹ amount"
                   style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:12, fontSize:15, fontWeight:700, color:'#fff', outline:'none', fontFamily:'inherit', marginBottom:8 }} />
                 <input value={note} onChange={e => setNote(e.target.value.slice(0,120))} placeholder="Why this price? e.g. extra wiring replaced"

@@ -39,7 +39,12 @@ export default function MapView({ workerLat, workerLng, customerLat, customerLng
     workerMarkerRef.current = L.marker([wLat, wLng], { icon: WORKER_ICON }).addTo(map).bindPopup('Worker')
     L.polyline([[cLat, cLng], [wLat, wLng]], { color: '#F5C000', weight: 3, dashArray: '6,6' }).addTo(map)
     mapInstanceRef.current = map
-    return () => { map.remove(); mapInstanceRef.current = null }
+    // Fix grey/blank tiles: container is sized after first paint
+    const t1 = setTimeout(() => map.invalidateSize(), 100)
+    const t2 = setTimeout(() => map.invalidateSize(), 600)
+    const onResize = () => map.invalidateSize()
+    window.addEventListener('resize', onResize)
+    return () => { clearTimeout(t1); clearTimeout(t2); window.removeEventListener('resize', onResize); map.remove(); mapInstanceRef.current = null }
   }, [])
 
   // Update worker position if it changes

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { sb } from '../lib/supabase'
 import AvatarUpload from '../components/AvatarUpload'
-import { floorFor, topFor, maxAllowedFor } from '../constants'
+import { floorFor } from '../constants'
 const Y='#F5C000', YL='#FFF8D6', GREEN='#22c55e'
 
 const ACHIEVEMENTS = [
@@ -51,17 +51,12 @@ function AchievementsModal({ profile, onClose }) {
 
 function BankModal({ profile, onClose, showToast }) {
   const [upi, setUpi] = useState(profile?.upi_id || '')
-  const [pMax, setPMax] = useState(profile?.price_max ? String(profile.price_max) : '')
   const [saving, setSaving] = useState(false)
   const floor = floorFor(profile?.skill) || profile?.price_min || 300
-  const cap   = maxAllowedFor(profile?.skill)
   async function save() {
     if (!upi.includes('@')) { showToast('Enter a valid UPI ID (e.g. name@upi)'); return }
-    const pm = parseInt(pMax, 10)
-    if (!pm || pm < floor) { showToast(`Max price can't be below the ₹${floor} minimum`); return }
-    if (pm > cap)          { showToast(`Max price can't exceed ₹${cap}`); return }
     setSaving(true)
-    const { error } = await sb.from('workers').update({ upi_id: upi.trim(), price_max: pm, price_min: floor }).eq('id', profile.id)
+    const { error } = await sb.from('workers').update({ upi_id: upi.trim(), price_min: floor }).eq('id', profile.id)
     if (error) showToast('Save failed: '+error.message)
     else showToast('Payment settings saved ✓')
     setSaving(false)
@@ -79,11 +74,7 @@ function BankModal({ profile, onClose, showToast }) {
           placeholder="yourname@upi"
           style={{ width:'100%', border:'1.5px solid #2a2a2a', borderRadius:12, padding:'13px 14px',
             fontSize:14, outline:'none', fontFamily:'inherit', background:'#1a1a1a', color:'#fff', boxSizing:'border-box', marginBottom:14 }} />
-        <p style={{ color:'#555', fontSize:13, marginBottom:8 }}>Your max job price (minimum is fixed at ₹{floor}, max allowed ₹{cap})</p>
-        <input value={pMax} onChange={e => setPMax(e.target.value.replace(/\D/g,'').slice(0,5))} type="tel"
-          placeholder={'e.g. '+(topFor(profile?.skill)||800)}
-          style={{ width:'100%', border:'1.5px solid #2a2a2a', borderRadius:12, padding:'13px 14px',
-            fontSize:14, outline:'none', fontFamily:'inherit', background:'#1a1a1a', color:'#fff', boxSizing:'border-box', marginBottom:14 }} />
+        <p style={{ color:'#555', fontSize:13, marginBottom:14 }}>Job minimum for your skill is fixed at ₹{floor}</p>
         <button onClick={save} disabled={saving}
           style={{ width:'100%', background:Y, border:'none', borderRadius:14, padding:16, fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'inherit', opacity:saving?0.6:1 }}>
           {saving ? 'Saving...' : 'Save →'}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { sb } from '../lib/supabase'
-import { floorFor, topFor, maxAllowedFor } from '../constants'
+import { floorFor } from '../constants'
 const Y='#F5C000', YL='#FFF8D6'
 const SKILLS=[{id:'elec',ico:'⚡',lbl:'Electrician'},{id:'plumb',ico:'🔧',lbl:'Plumber'},{id:'clean',ico:'🧹',lbl:'Cleaner'},{id:'carpen',ico:'🪚',lbl:'Carpenter'},{id:'paint',ico:'🎨',lbl:'Painter'},{id:'mech',ico:'🔩',lbl:'Mechanic'},{id:'pest',ico:'🐛',lbl:'Pest Control'},{id:'labor',ico:'👷',lbl:'Labourer'}]
 const CITIES=['Bengaluru','Mysuru','Mangaluru','Hubballi','Belagavi','Tumakuru']
@@ -14,7 +14,6 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
   const [skills,   setSkills]   = useState([])
   const [primary,  setPrimary]  = useState('')
   const [upiId,    setUpiId]    = useState('')
-  const [priceMax, setPriceMax] = useState('')
   const [aaFront,  setAaFront]  = useState(null)  // File object
   const [aaBack,   setAaBack]   = useState(null)
   const [aaPreF,   setAaPreF]   = useState(null)  // Preview URL
@@ -50,12 +49,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
   }
 
   function validatePricing() {
-    const sk = primary || skills[0]
-    const floor = floorFor(sk), cap = maxAllowedFor(sk)
     if (!upiId.includes('@')) { showToast('Enter a valid UPI ID (e.g. name@upi)'); return false }
-    const pm = parseInt(priceMax, 10)
-    if (!pm || pm < floor) { showToast(`Max price can't be below the ₹${floor} minimum`); return false }
-    if (pm > cap) { showToast(`Max price can't exceed ₹${cap} for this service`); return false }
     return true
   }
 
@@ -71,7 +65,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
         id: user.id, name, phone, city, address, skill: sk, skills,
         onboarding_done: true, trust_score: 60,
         aadhar_submitted: kycDone, aadhar_verified: false,
-        upi_id: upiId.trim(), price_min: floorFor(sk), price_max: parseInt(priceMax, 10),
+        upi_id: upiId.trim(), price_min: floorFor(sk),
       }).select().single()
       if (error) { showToast(error.message); return }
       setProfile(data)
@@ -159,26 +153,20 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
         {/* Step 2 — Pricing & UPI */}
         {step===2 && (() => {
           const sk = primary || skills[0]
-          const floor = floorFor(sk), typical = topFor(sk), cap = maxAllowedFor(sk)
+          const floor = floorFor(sk)
           return (
           <div style={{ background:'#fff', borderRadius:20, padding:20, border:'1px solid #eee' }}>
             <p style={{ fontWeight:800, fontSize:17, marginBottom:6 }}>💰 Pricing & UPI</p>
-            <p style={{ fontSize:13, color:'#888', marginBottom:16 }}>Customers pay you directly via UPI. Set the maximum you may charge for a job — for big jobs with extra issues.</p>
+            <p style={{ fontSize:13, color:'#888', marginBottom:16 }}>Customers pay you directly via UPI after each job.</p>
             <div style={{ marginBottom:14 }}>
               <label style={{ fontSize:12, fontWeight:700, color:'#555', display:'block', marginBottom:6 }}>YOUR UPI ID</label>
               <input value={upiId} onChange={e => setUpiId(e.target.value)} placeholder="yourname@upi"
                 style={{ width:'100%', border:'1.5px solid #E5E5EA', borderRadius:12, padding:13, fontSize:14, outline:'none', fontFamily:'inherit' }} />
             </div>
-            <div style={{ marginBottom:14 }}>
-              <label style={{ fontSize:12, fontWeight:700, color:'#555', display:'block', marginBottom:6 }}>YOUR MAX PRICE (₹)</label>
-              <input value={priceMax} onChange={e => setPriceMax(e.target.value.replace(/\D/g,'').slice(0,5))}
-                type="tel" placeholder={'e.g. '+typical}
-                style={{ width:'100%', border:'1.5px solid #E5E5EA', borderRadius:12, padding:13, fontSize:14, outline:'none', fontFamily:'inherit' }} />
-            </div>
             <div style={{ background:YL, borderRadius:12, padding:'10px 14px', display:'flex', gap:8, alignItems:'flex-start' }}>
               <span style={{ fontSize:16 }}>ℹ️</span>
               <p style={{ fontSize:12, color:'#666', flex:1 }}>
-                Minimum charge is fixed at <b>₹{floor}</b> — it can never go lower. Your max can be up to ₹{cap}. The final job price is always between ₹{floor} and your max, and the customer approves it before paying.
+                Minimum charge for your skill is fixed at <b>₹{floor}</b> — the job price can never go lower. You set the final price after the work is done and the customer approves it before paying.
               </p>
             </div>
           </div>
