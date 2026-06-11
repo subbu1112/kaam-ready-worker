@@ -35,6 +35,11 @@ export default function TermsModal({ onAccept, dark = false }) {
           <p>We collect your phone number, name, city, and booking history to provide our service. Your data is stored securely on Supabase (ISO 27001 compliant). We do not sell your data to third parties. Location data is only used to match workers to customers.</p>
           <p style={{ marginTop:8 }}>For queries: <span style={{ color:Y }}>support@thekaamready.in</span></p>
         </div>
+        <p style={{ fontSize:12, textAlign:'center', marginBottom:10 }}>
+          <a href="/terms.html" target="_blank" style={{ color:'#B8900A', fontWeight:700 }}>Read full Terms</a>
+          {' · '}
+          <a href="/privacy.html" target="_blank" style={{ color:'#B8900A', fontWeight:700 }}>Privacy Policy</a>
+        </p>
         <button onClick={onAccept}
           style={{ width:'100%', background:Y, border:'none', borderRadius:14, padding:16, fontSize:15, fontWeight:800,
             cursor:'pointer', fontFamily:'inherit' }}>
