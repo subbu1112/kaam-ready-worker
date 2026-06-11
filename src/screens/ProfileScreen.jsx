@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { sb } from '../lib/supabase'
 import AvatarUpload from '../components/AvatarUpload'
+import { floorFor, topFor, maxAllowedFor } from '../constants'
 const Y='#F5C000', YL='#FFF8D6', GREEN='#22c55e'
 
 const ACHIEVEMENTS = [
@@ -50,12 +51,19 @@ function AchievementsModal({ profile, onClose }) {
 
 function BankModal({ profile, onClose, showToast }) {
   const [upi, setUpi] = useState(profile?.upi_id || '')
+  const [pMax, setPMax] = useState(profile?.price_max ? String(profile.price_max) : '')
   const [saving, setSaving] = useState(false)
+  const floor = floorFor(profile?.skill) || profile?.price_min || 300
+  const cap   = maxAllowedFor(profile?.skill)
   async function save() {
+    if (!upi.includes('@')) { showToast('Enter a valid UPI ID (e.g. name@upi)'); return }
+    const pm = parseInt(pMax, 10)
+    if (!pm || pm < floor) { showToast(`Max price can't be below the ₹${floor} minimum`); return }
+    if (pm > cap)          { showToast(`Max price can't exceed ₹${cap}`); return }
     setSaving(true)
-    const { error } = await sb.from('workers').update({ upi_id: upi }).eq('id', profile.id)
+    const { error } = await sb.from('workers').update({ upi_id: upi.trim(), price_max: pm, price_min: floor }).eq('id', profile.id)
     if (error) showToast('Save failed: '+error.message)
-    else showToast('UPI ID saved ✓')
+    else showToast('Payment settings saved ✓')
     setSaving(false)
     onClose()
   }
@@ -63,17 +71,22 @@ function BankModal({ profile, onClose, showToast }) {
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.85)', zIndex:999, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
       <div style={{ background:'#111', borderRadius:'24px 24px 0 0', width:'100%', maxWidth:430, padding:'20px 20px 40px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-          <p style={{ fontWeight:800, fontSize:18, color:'#fff' }}>💳 Bank / UPI</p>
+          <p style={{ fontWeight:800, fontSize:18, color:'#fff' }}>💳 Payments & Pricing</p>
           <button onClick={onClose} style={{ background:'#1a1a1a', border:'none', borderRadius:10, padding:'6px 12px', color:'#fff', cursor:'pointer', fontFamily:'inherit' }}>Close</button>
         </div>
-        <p style={{ color:'#555', fontSize:13, marginBottom:14 }}>Your earnings will be transferred to this UPI ID</p>
+        <p style={{ color:'#555', fontSize:13, marginBottom:8 }}>Customers pay this UPI ID directly after each job</p>
         <input value={upi} onChange={e => setUpi(e.target.value)}
           placeholder="yourname@upi"
           style={{ width:'100%', border:'1.5px solid #2a2a2a', borderRadius:12, padding:'13px 14px',
             fontSize:14, outline:'none', fontFamily:'inherit', background:'#1a1a1a', color:'#fff', boxSizing:'border-box', marginBottom:14 }} />
+        <p style={{ color:'#555', fontSize:13, marginBottom:8 }}>Your max job price (minimum is fixed at ₹{floor}, max allowed ₹{cap})</p>
+        <input value={pMax} onChange={e => setPMax(e.target.value.replace(/\D/g,'').slice(0,5))} type="tel"
+          placeholder={'e.g. '+(topFor(profile?.skill)||800)}
+          style={{ width:'100%', border:'1.5px solid #2a2a2a', borderRadius:12, padding:'13px 14px',
+            fontSize:14, outline:'none', fontFamily:'inherit', background:'#1a1a1a', color:'#fff', boxSizing:'border-box', marginBottom:14 }} />
         <button onClick={save} disabled={saving}
           style={{ width:'100%', background:Y, border:'none', borderRadius:14, padding:16, fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'inherit', opacity:saving?0.6:1 }}>
-          {saving ? 'Saving...' : 'Save UPI ID →'}
+          {saving ? 'Saving...' : 'Save →'}
         </button>
       </div>
     </div>
@@ -91,7 +104,7 @@ export default function ProfileScreen({ profile, showToast }) {
   const menus = [
     ['📋','Job History',    null,     () => showToast('Coming soon!')],
     ['🏆','Achievements',  earned+' earned', () => setModal('achievements')],
-    ['💳','Bank Account',  profile?.upi_id ? '✓ Set' : 'Add UPI', () => setModal('bank')],
+    ['💳','Payments & Pricing',  profile?.upi_id ? '✓ Set' : 'Add UPI', () => setModal('bank')],
     ['📞','Support',       null,     () => showToast('Call 1800-KR-HELP')],
     ['⚙️','Settings',      null,     () => showToast('Coming soon!')],
   ]

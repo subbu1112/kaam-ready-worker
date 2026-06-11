@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { sb } from '../lib/supabase'
+import { floorFor, topFor, maxAllowedFor } from '../constants'
 const Y='#F5C000', YL='#FFF8D6'
 const SKILLS=[{id:'elec',ico:'⚡',lbl:'Electrician'},{id:'plumb',ico:'🔧',lbl:'Plumber'},{id:'clean',ico:'🧹',lbl:'Cleaner'},{id:'carpen',ico:'🪚',lbl:'Carpenter'},{id:'paint',ico:'🎨',lbl:'Painter'},{id:'mech',ico:'🔩',lbl:'Mechanic'},{id:'pest',ico:'🐛',lbl:'Pest Control'},{id:'labor',ico:'👷',lbl:'Labourer'}]
 const CITIES=['Bengaluru','Mysuru','Mangaluru','Hubballi','Belagavi','Tumakuru']
@@ -12,6 +13,8 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
   const [address,  setAddress]  = useState('')
   const [skills,   setSkills]   = useState([])
   const [primary,  setPrimary]  = useState('')
+  const [upiId,    setUpiId]    = useState('')
+  const [priceMax, setPriceMax] = useState('')
   const [aaFront,  setAaFront]  = useState(null)  // File object
   const [aaBack,   setAaBack]   = useState(null)
   const [aaPreF,   setAaPreF]   = useState(null)  // Preview URL
@@ -46,6 +49,16 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
     return uploads.length > 0
   }
 
+  function validatePricing() {
+    const sk = primary || skills[0]
+    const floor = floorFor(sk), cap = maxAllowedFor(sk)
+    if (!upiId.includes('@')) { showToast('Enter a valid UPI ID (e.g. name@upi)'); return false }
+    const pm = parseInt(priceMax, 10)
+    if (!pm || pm < floor) { showToast(`Max price can't be below the ₹${floor} minimum`); return false }
+    if (pm > cap) { showToast(`Max price can't exceed ₹${cap} for this service`); return false }
+    return true
+  }
+
   async function finish() {
     if (!name || !phone || !city || skills.length===0) { showToast('Fill in all required fields'); return }
     if (!aaFront || !aaBack) { showToast('Please upload both sides of Aadhaar'); return }
@@ -53,10 +66,12 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
     try {
       // Upload Aadhaar first
       const kycDone = await uploadKYC(user.id)
+      const sk = primary || skills[0]
       const { data, error } = await sb.from('workers').upsert({
-        id: user.id, name, phone, city, address, skill: primary||skills[0], skills,
+        id: user.id, name, phone, city, address, skill: sk, skills,
         onboarding_done: true, trust_score: 60,
         aadhar_submitted: kycDone, aadhar_verified: false,
+        upi_id: upiId.trim(), price_min: floorFor(sk), price_max: parseInt(priceMax, 10),
       }).select().single()
       if (error) { showToast(error.message); return }
       setProfile(data)
@@ -69,7 +84,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
     }
   }
 
-  const STEPS = ['Personal Details', 'Your Skills', 'Aadhaar KYC']
+  const STEPS = ['Personal Details', 'Your Skills', 'Pricing & UPI', 'Aadhaar KYC']
 
   return (
     <div style={{ height:'100vh', background:'#F2F2F7', maxWidth:430, margin:'0 auto', width:'100%', display:'flex', flexDirection:'column' }}>
@@ -141,8 +156,37 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
           </div>
         )}
 
-        {/* Step 2 — Aadhaar KYC */}
-        {step===2 && (
+        {/* Step 2 — Pricing & UPI */}
+        {step===2 && (() => {
+          const sk = primary || skills[0]
+          const floor = floorFor(sk), typical = topFor(sk), cap = maxAllowedFor(sk)
+          return (
+          <div style={{ background:'#fff', borderRadius:20, padding:20, border:'1px solid #eee' }}>
+            <p style={{ fontWeight:800, fontSize:17, marginBottom:6 }}>💰 Pricing & UPI</p>
+            <p style={{ fontSize:13, color:'#888', marginBottom:16 }}>Customers pay you directly via UPI. Set the maximum you may charge for a job — for big jobs with extra issues.</p>
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:12, fontWeight:700, color:'#555', display:'block', marginBottom:6 }}>YOUR UPI ID</label>
+              <input value={upiId} onChange={e => setUpiId(e.target.value)} placeholder="yourname@upi"
+                style={{ width:'100%', border:'1.5px solid #E5E5EA', borderRadius:12, padding:13, fontSize:14, outline:'none', fontFamily:'inherit' }} />
+            </div>
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:12, fontWeight:700, color:'#555', display:'block', marginBottom:6 }}>YOUR MAX PRICE (₹)</label>
+              <input value={priceMax} onChange={e => setPriceMax(e.target.value.replace(/\D/g,'').slice(0,5))}
+                type="tel" placeholder={'e.g. '+typical}
+                style={{ width:'100%', border:'1.5px solid #E5E5EA', borderRadius:12, padding:13, fontSize:14, outline:'none', fontFamily:'inherit' }} />
+            </div>
+            <div style={{ background:YL, borderRadius:12, padding:'10px 14px', display:'flex', gap:8, alignItems:'flex-start' }}>
+              <span style={{ fontSize:16 }}>ℹ️</span>
+              <p style={{ fontSize:12, color:'#666', flex:1 }}>
+                Minimum charge is fixed at <b>₹{floor}</b> — it can never go lower. Your max can be up to ₹{cap}. The final job price is always between ₹{floor} and your max, and the customer approves it before paying.
+              </p>
+            </div>
+          </div>
+          )
+        })()}
+
+        {/* Step 3 — Aadhaar KYC */}
+        {step===3 && (
           <div style={{ background:'#fff', borderRadius:20, padding:20, border:'1px solid #eee' }}>
             <p style={{ fontWeight:800, fontSize:17, marginBottom:6 }}>🛡️ Aadhaar Verification</p>
             <p style={{ fontSize:13, color:'#888', marginBottom:16 }}>Required for worker safety. Your Aadhaar is encrypted and only reviewed by our admin team.</p>
@@ -183,11 +227,12 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
             onClick={
               step===0 ? () => { if(!name||!phone||!city){showToast('Fill in all fields');return} setStep(1) }
               : step===1 ? () => { if(skills.length===0){showToast('Select at least one skill');return} setStep(2) }
+              : step===2 ? () => { if(validatePricing()) setStep(3) }
               : finish
             }
             disabled={busy}
             style={{ flex:2, background:Y, border:'none', borderRadius:14, padding:15, fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'inherit', opacity:busy?0.6:1 }}>
-            {busy ? 'Saving...' : step<2 ? 'Next →' : 'Finish & Start Working ✓'}
+            {busy ? 'Saving...' : step<3 ? 'Next →' : 'Finish & Start Working ✓'}
           </button>
         </div>
       </div>
