@@ -72,8 +72,17 @@ export default function HomeScreen({ user, profile, showToast }) {
     return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
   }
   // Nearest workers get the alert first; farther workers see it only if still unclaimed
+  function mySkills() {
+    const sk = profile?.skills && profile.skills.length ? profile.skills : [profile?.skill]
+    return sk.filter(Boolean)
+  }
+  function matchesSkill(b) {
+    if (!b?.service_id || b.service_id === 'emerg') return true   // emergencies go to everyone
+    return mySkills().includes(b.service_id)
+  }
   function offerJob(b) {
     if (b.city !== profile?.city) return
+    if (!matchesSkill(b)) return
     let delay = 0
     if (b.preferred_worker_id && b.preferred_worker_id !== user.id) delay = 60000  // preferred worker gets 60s head start
     else if (b.preferred_worker_id === user.id) delay = 0
@@ -97,6 +106,7 @@ export default function HomeScreen({ user, profile, showToast }) {
       .subscribe()
     // Also pick up jobs that were already waiting before we came online
     sb.from('bookings').select('*').eq('status','searching').eq('city', profile?.city)
+      .in('service_id', [...mySkills(), 'emerg'])
       .gte('created_at', new Date(Date.now()-3*60*1000).toISOString())
       .order('created_at',{ascending:false}).limit(1)
       .then(({ data }) => { if (data?.[0]) offerJob(data[0]) })
@@ -104,7 +114,7 @@ export default function HomeScreen({ user, profile, showToast }) {
   }
   async function loadScheduled() {
     const [avail, mine] = await Promise.all([
-      sb.from('bookings').select('*').eq('status','scheduled').is('worker_id', null).eq('city', profile?.city).gte('scheduled_at', new Date().toISOString()).order('scheduled_at').limit(5),
+      sb.from('bookings').select('*').eq('status','scheduled').is('worker_id', null).eq('city', profile?.city).in('service_id', [...mySkills(), 'emerg']).gte('scheduled_at', new Date().toISOString()).order('scheduled_at').limit(5),
       sb.from('bookings').select('*').eq('worker_id', user.id).eq('is_scheduled', true).eq('status','assigned').gte('scheduled_at', new Date(Date.now()-30*60*1000).toISOString()).order('scheduled_at').limit(5),
     ])
     setSchedAvail(avail.data || [])
