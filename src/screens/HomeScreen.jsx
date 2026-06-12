@@ -111,8 +111,9 @@ export default function HomeScreen({ user, profile, showToast }) {
     setUpcoming(mine.data || [])
   }
   async function acceptScheduled(b) {
-    const { error } = await sb.from('bookings').update({ worker_id: user.id, status:'assigned', worker:{ id:user.id, name:profile?.name, skill:profile?.skill, rating:profile?.rating, ico:'👷' } }).eq('id', b.id).is('worker_id', null)
+    const { data, error } = await sb.from('bookings').update({ worker_id: user.id, status:'assigned', worker:{ id:user.id, name:profile?.name, skill:profile?.skill, rating:profile?.rating, ico:'👷' } }).eq('id', b.id).is('worker_id', null).select()
     if (error) { showToast(error.message); return }
+    if (!data || data.length===0) { showToast('Another worker already took this job'); loadScheduled(); return }
     showToast('Scheduled job is yours ✓ 📅')
     loadScheduled()
   }
@@ -143,8 +144,13 @@ export default function HomeScreen({ user, profile, showToast }) {
     const pos = await getPosition()
     if (pos) sb.from('workers').update({ lat: pos.lat, lng: pos.lng }).eq('id', user.id).then(()=>{})
     const w={id:user.id,name:profile?.name,skill:profile?.skill,rating:profile?.rating,jobs:profile?.total_jobs,ico:'👷',eta:'8 min',dist:'1.0 km',lat:pos?.lat,lng:pos?.lng}
-    await sb.from('bookings').update({status:'assigned',worker_id:user.id,worker:w}).eq('id',jobAlert.id)
-    setActiveJob({...jobAlert,status:'assigned',worker:w}); setJobAlert(null); showToast('Job accepted! Navigate to customer 🗺️')
+    const { data, error } = await sb.from('bookings')
+      .update({status:'assigned',worker_id:user.id,worker:w})
+      .eq('id',jobAlert.id).eq('status','searching').is('worker_id', null)
+      .select()
+    if (error) { showToast('Could not accept: '+error.message); return }
+    if (!data || data.length===0) { showToast('Too late — another worker took this job'); setJobAlert(null); return }
+    setActiveJob({...data[0],worker:w}); setJobAlert(null); showToast('Job accepted! Navigate to customer 🗺️')
   }
   function navigateToCustomer() {
     const j = activeJob
