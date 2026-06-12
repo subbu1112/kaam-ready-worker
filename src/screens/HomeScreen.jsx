@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { sb } from '../lib/supabase'
 import MapView from '../components/MapView'
-import { floorFor, COMMISSION } from '../constants'
+import { floorFor, COMMISSION, PLATFORM_UPI, MIN_CREDIT, RECHARGE_PRESETS } from '../constants'
 import { t } from '../i18n'
 const Y='#F5C000',YL='#FFF8D6',GREEN='#22c55e',RED='#ef4444'
 export default function HomeScreen({ user, profile, showToast }) {
@@ -17,6 +17,10 @@ export default function HomeScreen({ user, profile, showToast }) {
   const [upcoming,  setUpcoming]  = useState([])   // my accepted scheduled jobs
   const [schedAvail,setSchedAvail]= useState([])   // scheduled jobs anyone can take
   const [photoBusy, setPhotoBusy] = useState(null)
+  const [credit,    setCredit]    = useState(null)
+  const [showRecharge, setShowRecharge] = useState(false)
+  const [rcAmt,     setRcAmt]     = useState(200)
+  const [rcStep,    setRcStep]    = useState(0)   // 0 pick, 1 paid-claim sent
   const timer=useRef(null), chan=useRef(null), jobChan=useRef(null)
   useEffect(() => { if(profile) loadTodayStats() }, [profile])
   // Restore an in-progress job after refresh
@@ -50,6 +54,12 @@ export default function HomeScreen({ user, profile, showToast }) {
       }).subscribe()
     return () => { if (jobChan.current) sb.removeChannel(jobChan.current) }
   }, [activeJob?.id])
+  async function loadCredit() {
+    if(!user) return
+    const { data } = await sb.from('workers').select('credit_balance').eq('id', user.id).single()
+    setCredit(data?.credit_balance ?? 0)
+  }
+  useEffect(() => { if(user?.id) loadCredit() }, [user?.id])
   async function loadTodayStats() {
     if(!user) return
     const today=new Date().toISOString().slice(0,10)
@@ -172,18 +182,32 @@ export default function HomeScreen({ user, profile, showToast }) {
       payment_confirmed_at:new Date().toISOString(), completed_at:new Date().toISOString(),
     }).eq('id', activeJob.id)
     if (!error) {
+      const newCredit = (credit ?? 0) - fee
       await sb.from('workers').update({
         wallet_balance: (profile?.wallet_balance||0) + amt - fee,
-        commission_due: (profile?.commission_due||0) + fee,
+        credit_balance: newCredit,
         total_jobs:     (profile?.total_jobs||0) + 1,
       }).eq('id', user.id)
+      setCredit(newCredit)
       setTodayEarn(e=>e+amt); setTodayJobs(j=>j+1)
       setActiveJob(null); setPrice(''); setNote('')
       showToast('₹'+(amt-fee).toLocaleString('en-IN')+' received (₹'+fee+' platform fee) 💰')
     } else { showToast(error.message) }
     setBusy(false)
   }
-  function toggleOnline() { const next=!online; setOnline(next); showToast(next?'You are now Online 🟢':'You are now Offline') }
+  function toggleOnline() {
+    const next=!online
+    if (next && (credit ?? 0) < MIN_CREDIT) { setShowRecharge(true); showToast('Recharge your credits to go online ⚡'); return }
+    setOnline(next); showToast(next?'You are now Online 🟢':'You are now Offline')
+  }
+  function openUpiRecharge() {
+    window.location.href = `upi://pay?pa=${encodeURIComponent(PLATFORM_UPI)}&pn=${encodeURIComponent('Kaam Ready')}&am=${rcAmt}&cu=INR&tn=${encodeURIComponent('Kaam Ready credits')}`
+  }
+  async function claimRecharge() {
+    const { error } = await sb.from('recharges').insert({ worker_id: user.id, amount: rcAmt, status:'claimed' })
+    if (error) { showToast(error.message); return }
+    setRcStep(1)
+  }
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <div style={{ background:online?GREEN:'#1C1C1E', padding:'10px 20px 6px', display:'flex', justifyContent:'space-between', transition:'background .3s' }}>
@@ -201,6 +225,48 @@ export default function HomeScreen({ user, profile, showToast }) {
         </div>
       </div>
       <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:12 }}>
+        <div onClick={() => { setRcStep(0); setShowRecharge(true) }}
+          style={{ background: (credit??0) < MIN_CREDIT ? '#2a0a0a' : '#111', border:'1px solid '+((credit??0) < MIN_CREDIT ? '#7f1d1d' : '#2a2a2a'), borderRadius:14, padding:'10px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer' }}>
+          <span style={{ color:(credit??0) < MIN_CREDIT ? '#f87171' : '#888', fontSize:12, fontWeight:700 }}>
+            ⚡ Credits: ₹{credit ?? '…'} {(credit??0) < MIN_CREDIT ? '— recharge to receive jobs' : ''}
+          </span>
+          <span style={{ background:Y, color:'#000', borderRadius:8, padding:'4px 10px', fontSize:11, fontWeight:800 }}>+ Recharge</span>
+        </div>
+        {showRecharge && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.85)', zIndex:999, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+            <div style={{ background:'#111', borderRadius:'24px 24px 0 0', width:'100%', maxWidth:430, padding:'20px 20px 40px' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+                <p style={{ fontWeight:800, fontSize:18, color:'#fff' }}>⚡ Recharge Credits</p>
+                <button onClick={() => setShowRecharge(false)} style={{ background:'#1a1a1a', border:'none', borderRadius:10, padding:'6px 12px', color:'#fff', cursor:'pointer', fontFamily:'inherit' }}>Close</button>
+              </div>
+              {rcStep===0 ? <>
+                <p style={{ color:'#888', fontSize:13, marginBottom:14 }}>Credits pay your 10% platform fee per job. Balance: <b style={{ color:Y }}>₹{credit ?? 0}</b>. You need at least ₹{MIN_CREDIT} to go online.</p>
+                <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+                  {RECHARGE_PRESETS.map(a => (
+                    <button key={a} onClick={() => setRcAmt(a)}
+                      style={{ flex:1, background: rcAmt===a ? Y : '#1a1a1a', color: rcAmt===a ? '#000' : '#888', border:'none', borderRadius:12, padding:13, fontWeight:800, fontSize:15, cursor:'pointer', fontFamily:'inherit' }}>₹{a}</button>
+                  ))}
+                </div>
+                <button onClick={openUpiRecharge}
+                  style={{ width:'100%', background:Y, border:'none', borderRadius:14, padding:15, fontWeight:800, fontSize:15, cursor:'pointer', fontFamily:'inherit', marginBottom:8 }}>
+                  Pay ₹{rcAmt} via UPI 📲
+                </button>
+                <button onClick={claimRecharge}
+                  style={{ width:'100%', background:'#1C1C1E', color:'#fff', border:'1px solid #2a2a2a', borderRadius:14, padding:13, fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+                  I've Paid ✓
+                </button>
+              </> : (
+                <div style={{ textAlign:'center', padding:'10px 0' }}>
+                  <div style={{ fontSize:44, marginBottom:10 }}>⏳</div>
+                  <p style={{ color:'#fff', fontWeight:800, fontSize:16 }}>Recharge being verified</p>
+                  <p style={{ color:'#888', fontSize:13, marginTop:6 }}>₹{rcAmt} will be added to your credits once our team confirms the payment (usually within an hour).</p>
+                  <button onClick={() => { setShowRecharge(false); loadCredit() }}
+                    style={{ marginTop:14, background:Y, border:'none', borderRadius:12, padding:'12px 24px', fontWeight:800, cursor:'pointer', fontFamily:'inherit' }}>Done</button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {!online && !activeJob && (
           <div style={{ background:'#111', borderRadius:20, padding:'28px 24px', textAlign:'center', border:'1.5px dashed #2a2a2a' }}>
             <div style={{ fontSize:44, marginBottom:12 }}>😴</div>

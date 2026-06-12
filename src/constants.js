@@ -15,3 +15,8 @@ export const floorFor = id => PRICING[id]?.min ?? 300
 export const topFor   = id => PRICING[id]?.top ?? 1000
 export const maxAllowedFor = id => topFor(id) * 2
 export const COMMISSION = 0.10
+
+// Prepaid credit system
+export const PLATFORM_UPI = 'PLATFORM_UPI_PENDING@upi'   // ← replace with real UPI ID
+export const MIN_CREDIT = 20      // minimum balance (₹) required to go online
+export const RECHARGE_PRESETS = [100, 200, 500]
