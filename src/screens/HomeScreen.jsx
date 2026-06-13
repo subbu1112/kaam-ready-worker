@@ -99,8 +99,19 @@ export default function HomeScreen({ user, profile, showToast }) {
     if (!activeJob?.id) return
     jobChan.current = sb.channel('job-' + activeJob.id)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings', filter: 'id=eq.' + activeJob.id }, payload => {
-        setActiveJob(prev => prev ? { ...prev, ...payload.new } : prev)
-        if (payload.new.payment_status === 'claimed') showToast('Customer says payment sent — please confirm 💸')
+        const upd = payload.new
+        // Admin confirmed payment — auto-release worker
+        if (upd.status === 'completed' && upd.payment_status === 'paid') {
+          const amt = upd.amount || 0
+          const fee = Math.round(amt * COMMISSION)
+          setTodayEarn(e => e + amt)
+          setTodayJobs(j => j + 1)
+          setActiveJob(null); setPrice(''); setNote(''); setShowPrice(false)
+          showToast('✅ Job complete! Rs.' + (amt - fee).toLocaleString('en-IN') + ' added to your weekly payout')
+          return
+        }
+        setActiveJob(prev => prev ? { ...prev, ...upd } : prev)
+        if (upd.payment_status === 'claimed') showToast('Customer paid — admin is verifying 🔄')
       }).subscribe()
     return () => { if (jobChan.current) sb.removeChannel(jobChan.current) }
   }, [activeJob?.id])
@@ -240,31 +251,7 @@ export default function HomeScreen({ user, profile, showToast }) {
     showToast('Price sent — waiting for customer to pay via UPI 💳')
   }
 
-  async function confirmPayment() {
-    if (!activeJob || busy) return
-    setBusy(true)
-    const amt = activeJob.amount || 0
-    const fee = Math.round(amt * COMMISSION)
-    const { error } = await sb.from('bookings').update({
-      payment_status: 'paid', payment_method: 'upi', status: 'completed',
-      payment_confirmed_at: new Date().toISOString(), completed_at: new Date().toISOString(),
-    }).eq('id', activeJob.id)
-    if (!error) {
-      // Fetch fresh worker data to avoid stale wallet_balance from initial load
-      const { data: fresh } = await sb.from('workers').select('wallet_balance, commission_due, total_jobs').eq('id', user.id).single()
-      const base = fresh || {}
-      await sb.from('workers').update({
-        wallet_balance: (base.wallet_balance || 0) + amt - fee,
-        commission_due: (base.commission_due || 0) + fee,
-        total_jobs: (base.total_jobs || 0) + 1,
-      }).eq('id', user.id)
-      setTodayEarn(e => e + amt)
-      setTodayJobs(j => j + 1)
-      setActiveJob(null); setPrice(''); setNote('')
-      showToast('Rs.' + (amt - fee).toLocaleString('en-IN') + ' received (Rs.' + fee + ' platform fee) 💰')
-    } else { showToast(error.message) }
-    setBusy(false)
-  }
+
 
   async function cancelJob() {
     if (!activeJob || busy) return
@@ -495,7 +482,7 @@ export default function HomeScreen({ user, profile, showToast }) {
                 <div style={{ textAlign: 'right' }}>
                   <p style={{ fontSize: 11, color: '#9E9E9E', margin: 0 }}>Status</p>
                   <p style={{ fontSize: 13, fontWeight: 800, margin: 0, lineHeight: 1.1, color: jobStatus === 'payment_claimed' ? GREEN : jobStatus === 'awaiting_payment' ? '#F59E0B' : '#212121' }}>
-                    {jobStatus === 'payment_claimed' ? '💸 Paid' : jobStatus === 'awaiting_payment' ? '⏳ Awaiting' : '⚡ Active'}
+                    {jobStatus === 'payment_claimed' ? '🔄 Verifying' : jobStatus === 'awaiting_payment' ? '⏳ Awaiting' : '⚡ Active'}
                   </p>
                 </div>
               </div>
@@ -621,16 +608,18 @@ export default function HomeScreen({ user, profile, showToast }) {
             </div>
           )}
 
-          {/* Confirm payment */}
+          {/* Admin verifying payment — worker just waits */}
           {jobStatus === 'payment_claimed' && (
-            <div>
-              <p style={{ color: '#1B5E20', fontWeight: 800, fontSize: 14, margin: '0 0 8px', textAlign: 'center' }}>
-                💸 Customer sent Rs.{activeJob.amount} via UPI
-              </p>
-              <button onClick={confirmPayment} disabled={busy}
-                style={{ width: '100%', background: busy ? '#E0E0E0' : GREEN, color: '#fff', border: 'none', borderRadius: 12, padding: 16, fontWeight: 900, fontSize: 15, cursor: 'pointer', fontFamily: 'Inter, sans-serif', opacity: busy ? 0.7 : 1, boxShadow: busy ? 'none' : '0 4px 12px rgba(37,211,102,.35)' }}>
-                {busy ? '…' : t('✓ Confirm Payment Received')}
-              </button>
+            <div style={{ background: '#E8F5E9', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ fontSize: 28, flexShrink: 0 }}>🔄</div>
+              <div>
+                <p style={{ color: '#1B5E20', fontWeight: 800, fontSize: 14, margin: 0 }}>
+                  Customer paid Rs.{activeJob.amount}
+                </p>
+                <p style={{ color: '#2E7D32', fontSize: 12, margin: '2px 0 0' }}>
+                  Admin is verifying — your wallet will be credited after confirmation
+                </p>
+              </div>
             </div>
           )}
         </div>
