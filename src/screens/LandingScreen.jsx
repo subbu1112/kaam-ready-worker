@@ -1,9 +1,32 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useRef } from 'react'
 
 const Y = '#F5C000'
 const DARK = '#1A1A1A'
 
 function PhoneMockup() {
+  const [deferredPrompt, setDeferredPrompt] = useState(null)
+  const [installed, setInstalled] = useState(false)
+  const [showIosHint, setShowIosHint] = useState(false)
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
+  const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches
+
+  useEffect(() => {
+    if (isInStandaloneMode) { setInstalled(true); return }
+    const handler = e => { e.preventDefault(); setDeferredPrompt(e) }
+    window.addEventListener('beforeinstallprompt', handler)
+    window.addEventListener('appinstalled', () => setInstalled(true))
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  async function handleInstall() {
+    if (isIos) { setShowIosHint(h => !h); return }
+    if (!deferredPrompt) { setShowIosHint(true); return }
+    deferredPrompt.prompt()
+    const { outcome } = await deferredPrompt.userChoice
+    if (outcome === 'accepted') setInstalled(true)
+    setDeferredPrompt(null)
+  }
+
   return (
     <div style={{ position:'relative', width:200, height:360, margin:'0 auto', flexShrink:0 }}>
       <div style={{ width:200, height:360, background:'#FFFFFF', borderRadius:36,
@@ -80,6 +103,29 @@ export default function LandingScreen({ setScreen }) {
     return () => document.getElementById('kr-wlanding')?.remove()
   }, [])
 
+  const [deferredPrompt, setDeferredPrompt] = useState(null)
+  const [installed, setInstalled] = useState(false)
+  const [showIosHint, setShowIosHint] = useState(false)
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
+  const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches
+
+  useEffect(() => {
+    if (isInStandaloneMode) { setInstalled(true); return }
+    const handler = e => { e.preventDefault(); setDeferredPrompt(e) }
+    window.addEventListener('beforeinstallprompt', handler)
+    window.addEventListener('appinstalled', () => setInstalled(true))
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  async function handleInstall() {
+    if (isIos) { setShowIosHint(h => !h); return }
+    if (!deferredPrompt) { setShowIosHint(true); return }
+    deferredPrompt.prompt()
+    const { outcome } = await deferredPrompt.userChoice
+    if (outcome === 'accepted') setInstalled(true)
+    setDeferredPrompt(null)
+  }
+
   return (
     <div style={{ height:'100dvh', overflowY:'auto', WebkitOverflowScrolling:'touch',
       background:'#FFFFFF', fontFamily:'Inter, system-ui, sans-serif' }}>
@@ -96,15 +142,23 @@ export default function LandingScreen({ setScreen }) {
               <span style={{ fontSize:11, color:'#9CA3AF', display:'block', marginTop:-2 }}>For Workers</span>
             </div>
           </div>
-          <div style={{ display:'flex', gap:10 }}>
+          <div style={{ display:'flex', gap:8 }}>
+            {!installed && (
+              <button onClick={handleInstall}
+                style={{ background:'#F5F5F5', border:'none', borderRadius:10, padding:'8px 14px',
+                  fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit', color:'#1A1A1A',
+                  display:'flex', alignItems:'center', gap:6 }}>
+                ⬇️ Download
+              </button>
+            )}
             <button onClick={() => setScreen('login')}
-              style={{ background:'none', border:'1.5px solid #E5E7EB', borderRadius:10, padding:'8px 16px',
-                fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit', color:'#6B7280' }}>
+              style={{ background:'none', border:'1.5px solid #E5E7EB', borderRadius:10, padding:'8px 14px',
+                fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit', color:'#6B7280' }}>
               Sign Up
             </button>
             <button onClick={() => setScreen('login')}
-              style={{ background:DARK, border:'none', borderRadius:10, padding:'9px 18px',
-                fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit', color:Y }}>
+              style={{ background:DARK, border:'none', borderRadius:10, padding:'9px 16px',
+                fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit', color:Y }}>
               Login
             </button>
           </div>
@@ -148,7 +202,25 @@ export default function LandingScreen({ setScreen }) {
                   fontFamily:'inherit' }}>
                 Learn More
               </button>
+              {!installed && (
+                <button onClick={handleInstall}
+                  style={{ background:'rgba(0,0,0,.12)', color:DARK, border:'1.5px solid rgba(0,0,0,.2)',
+                    borderRadius:14, padding:'15px 24px', fontWeight:700, fontSize:15, cursor:'pointer',
+                    fontFamily:'inherit', display:'flex', alignItems:'center', gap:8 }}>
+                  <span>⬇️</span> Install App
+                </button>
+              )}
+              {installed && (
+                <div style={{ background:'rgba(0,0,0,.12)', borderRadius:14, padding:'15px 20px',
+                  color:'#1B5E20', fontWeight:700, fontSize:14 }}>✓ App Installed</div>
+              )}
             </div>
+            {showIosHint && (
+              <div style={{ marginTop:16, background:'rgba(0,0,0,.12)', borderRadius:14,
+                padding:'14px 16px', color:DARK, fontSize:13, lineHeight:1.6 }}>
+                📱 On iPhone: tap <strong>Share →</strong> then <strong>"Add to Home Screen"</strong>
+              </div>
+            )}
           </div>
           <div><PhoneMockup /></div>
         </div>
