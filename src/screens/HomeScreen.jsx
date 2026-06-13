@@ -266,6 +266,16 @@ export default function HomeScreen({ user, profile, showToast }) {
     setBusy(false)
   }
 
+  async function cancelJob() {
+    if (!activeJob || busy) return
+    if (!window.confirm('Cancel this job? The customer will be notified.')) return
+    setBusy(true)
+    await sb.from('bookings').update({ status: 'searching', worker_id: null, worker: null }).eq('id', activeJob.id)
+    setBusy(false)
+    setActiveJob(null); setPrice(''); setNote(''); setShowPrice(false)
+    showToast('Job cancelled — customer will be re-matched')
+  }
+
   function toggleOnline() {
     const next = !online
     setOnline(next)
@@ -535,16 +545,7 @@ export default function HomeScreen({ user, profile, showToast }) {
                     height={160}
                   />
                 </div>
-                <div style={{ display: 'flex', gap: 8, margin: '10px 18px 0' }}>
-                  {[['before', activeJob.photo_before_url], ['after', activeJob.photo_after_url]].map(([which, url]) => (
-                    <label key={which}
-                      style={{ flex: 1, background: url ? '#E8F5E9' : '#F5F5F5', border: '1px solid ' + (url ? '#A5D6A7' : '#E0E0E0'), borderRadius: 12, padding: 12, textAlign: 'center', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: url ? '#1B5E20' : '#9E9E9E' }}>
-                      {photoBusy === which ? '…' : (url ? '✓ ' : '📷 ') + t(which === 'before' ? 'Before' : 'After')}
-                      <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-                        onChange={e => uploadJobPhoto(which, e.target.files[0])} />
-                    </label>
-                  ))}
-                </div>
+
               </>
             )}
 
@@ -556,81 +557,84 @@ export default function HomeScreen({ user, profile, showToast }) {
               {activeJob.amount && <span style={{ fontSize: 15, fontWeight: 700, color: '#212121' }}>Rs.{activeJob.amount}</span>}
             </div>
 
-            <div style={{ height: 4, background: '#F5F5F5', margin: '12px 0 0' }} />
-
-            {/* Action area */}
-            <div style={{ padding: '0 18px 16px' }}>
-
-              {jobStatus === 'in_progress' && !showPrice && (
-                <button onClick={() => { setPrice(''); setNote(''); setShowPrice(true) }}
-                  style={{ width: '100%', background: Y, border: 'none', borderRadius: 10, padding: 15, fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'Inter, sans-serif', color: '#412402', marginTop: 12, boxShadow: '0 4px 12px rgba(245,192,0,.3)' }}>
-                  {t('Work Done — Set Final Price ₹')}
-                </button>
-              )}
-
-              {jobStatus === 'in_progress' && showPrice && (
-                <div style={{ background: '#F9F9F9', borderRadius: 14, padding: 14, marginTop: 12, border: '1px solid #EEEEEE' }}>
-                  <p style={{ color: '#412402', fontWeight: 800, fontSize: 14, marginBottom: 4 }}>Set Final Price</p>
-                  <p style={{ color: '#9E9E9E', fontSize: 12, marginBottom: 12 }}>
-                    Minimum: Rs.{jobFloor(activeJob)} — price fairly, customer approves before paying
-                  </p>
-                  <input value={price}
-                    onChange={e => setPrice(e.target.value.replace(/\D/g, '').slice(0, 5))}
-                    type="tel" placeholder="Rs. amount"
-                    style={{ width: '100%', background: '#fff', border: '1.5px solid #E0E0E0', borderRadius: 10, padding: '13px 14px', fontSize: 20, fontWeight: 800, color: '#412402', outline: 'none', fontFamily: 'Inter, sans-serif', marginBottom: 10, boxSizing: 'border-box' }} />
-                  <input value={note} onChange={e => setNote(e.target.value.slice(0, 120))}
-                    placeholder="Why this price? e.g. extra wiring replaced"
-                    style={{ width: '100%', background: '#fff', border: '1.5px solid #E0E0E0', borderRadius: 10, padding: '12px 14px', fontSize: 13, color: '#757575', outline: 'none', fontFamily: 'Inter, sans-serif', marginBottom: 12, boxSizing: 'border-box' }} />
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => setShowPrice(false)}
-                      style={{ flex: 1, background: '#F5F5F5', color: '#9E9E9E', border: '1px solid #E0E0E0', borderRadius: 10, padding: 12, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
-                      Cancel
-                    </button>
-                    <button onClick={submitPrice} disabled={busy}
-                      style={{ flex: 2, background: busy ? '#E0E0E0' : Y, border: 'none', borderRadius: 10, padding: 12, fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'Inter, sans-serif', color: busy ? '#9E9E9E' : '#412402', opacity: busy ? 0.7 : 1 }}>
-                      {busy ? '…' : t('Send to Customer →')}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {jobStatus === 'awaiting_payment' && (
-                <div style={{ background: '#FFFDE7', borderRadius: 14, padding: '18px 14px', marginTop: 12, textAlign: 'center', border: '1px solid #FFF176' }}>
-                  <div style={{ fontSize: 36, marginBottom: 10 }}>⏳</div>
-                  <p style={{ color: '#212121', fontWeight: 800, fontSize: 16 }}>Rs.{activeJob.amount} sent to customer</p>
-                  <p style={{ color: '#9E9E9E', fontSize: 13, marginTop: 6 }}>Waiting for them to approve and pay via UPI…</p>
-                  <button onClick={() => {
-                    setPrice(String(activeJob.amount || ''))
-                    setNote(activeJob.price_note || '')
-                    setActiveJob(p => ({ ...p, status: 'assigned' }))
-                    setShowPrice(true)
-                  }} style={{ marginTop: 14, background: 'none', border: '1px solid #E0E0E0', borderRadius: 10, color: '#9E9E9E', padding: '8px 18px', fontSize: 12, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
-                    Edit price
-                  </button>
-                </div>
-              )}
-
-              {jobStatus === 'payment_claimed' && (
-                <div style={{ background: '#E8F5E9', border: '1.5px solid #A5D6A7', borderRadius: 14, padding: '20px 14px', marginTop: 12, textAlign: 'center', boxShadow: '0 0 14px rgba(37,211,102,.12)' }}>
-                  <div style={{ fontSize: 40, marginBottom: 10 }}>💸</div>
-                  <p style={{ color: '#212121', fontWeight: 900, fontSize: 17 }}>Customer paid Rs.{activeJob.amount} via UPI</p>
-                  <p style={{ color: '#2E7D32', fontSize: 13, margin: '6px 0 16px' }}>Check your UPI app, then confirm below</p>
-                  <button onClick={confirmPayment} disabled={busy}
-                    style={{ width: '100%', background: busy ? '#E0E0E0' : GREEN, color: '#fff', border: 'none', borderRadius: 10, padding: 16, fontWeight: 900, fontSize: 15, cursor: 'pointer', fontFamily: 'Inter, sans-serif', opacity: busy ? 0.7 : 1, boxShadow: busy ? 'none' : '0 4px 12px rgba(37,211,102,.35)' }}>
-                    {busy ? '…' : t('✓ Confirm Payment Received')}
-                  </button>
-                </div>
-              )}
-
-              {(jobStatus === 'in_progress' || jobStatus === 'awaiting_payment') && !showPrice && (
-                <p style={{ textAlign: 'center', fontSize: 13, color: RED, padding: '10px 0 0', cursor: 'pointer', margin: 0, fontWeight: 600 }}>
-                  Cancel job
-                </p>
-              )}
-            </div>
           </div>
         )}
       </div>
+
+      {/* ── Sticky action bar — always visible above TabBar ── */}
+      {activeJob && jobStatus && (
+        <div style={{ flexShrink: 0, background: '#FFFFFF', borderTop: '1px solid #F0F0F0', padding: '10px 16px 12px' }}>
+
+          {/* Work Done button */}
+          {jobStatus === 'in_progress' && !showPrice && (
+            <div>
+              <button onClick={() => { setPrice(''); setNote(''); setShowPrice(true) }}
+                style={{ width: '100%', background: Y, border: 'none', borderRadius: 12, padding: 16, fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'Inter, sans-serif', color: '#412402', boxShadow: '0 4px 12px rgba(245,192,0,.35)' }}>
+                {t('Work Done — Set Final Price ₹')}
+              </button>
+              <p onClick={cancelJob}
+                style={{ textAlign: 'center', fontSize: 13, color: RED, padding: '8px 0 0', cursor: 'pointer', margin: 0, fontWeight: 600 }}>
+                Cancel job
+              </p>
+            </div>
+          )}
+
+          {/* Price input panel */}
+          {jobStatus === 'in_progress' && showPrice && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <p style={{ color: '#412402', fontWeight: 800, fontSize: 14, margin: 0 }}>
+                  Set Final Price — min Rs.{jobFloor(activeJob)}
+                </p>
+                <button onClick={() => setShowPrice(false)}
+                  style={{ background: 'none', border: 'none', color: '#9E9E9E', fontSize: 13, cursor: 'pointer', fontWeight: 700 }}>✕ Cancel</button>
+              </div>
+              <input value={price}
+                onChange={e => setPrice(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                type="tel" placeholder="Rs. amount" autoFocus
+                style={{ width: '100%', background: '#fff', border: '2px solid ' + Y, borderRadius: 10, padding: '13px 14px', fontSize: 22, fontWeight: 800, color: '#412402', outline: 'none', fontFamily: 'Inter, sans-serif', marginBottom: 8, boxSizing: 'border-box' }} />
+              <input value={note} onChange={e => setNote(e.target.value.slice(0, 120))}
+                placeholder="Optional: reason e.g. extra parts replaced"
+                style={{ width: '100%', background: '#fff', border: '1.5px solid #E0E0E0', borderRadius: 10, padding: '11px 14px', fontSize: 13, color: '#757575', outline: 'none', fontFamily: 'Inter, sans-serif', marginBottom: 10, boxSizing: 'border-box' }} />
+              <button onClick={submitPrice} disabled={busy}
+                style={{ width: '100%', background: busy ? '#E0E0E0' : Y, border: 'none', borderRadius: 10, padding: 14, fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'Inter, sans-serif', color: busy ? '#9E9E9E' : '#412402', opacity: busy ? 0.7 : 1 }}>
+                {busy ? '…' : t('Send to Customer →')}
+              </button>
+            </div>
+          )}
+
+          {/* Awaiting payment */}
+          {jobStatus === 'awaiting_payment' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <p style={{ color: '#212121', fontWeight: 800, fontSize: 14, margin: 0 }}>⏳ Rs.{activeJob.amount} — waiting for customer</p>
+                <p style={{ color: '#9E9E9E', fontSize: 12, margin: '2px 0 0' }}>Customer is reviewing price and paying via UPI</p>
+              </div>
+              <button onClick={() => {
+                setPrice(String(activeJob.amount || ''))
+                setNote(activeJob.price_note || '')
+                setActiveJob(p => ({ ...p, status: 'assigned' }))
+                setShowPrice(true)
+              }} style={{ background: '#F5F5F5', border: '1px solid #E0E0E0', borderRadius: 10, color: '#9E9E9E', padding: '10px 14px', fontSize: 12, cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontWeight: 700, flexShrink: 0 }}>
+                Edit
+              </button>
+            </div>
+          )}
+
+          {/* Confirm payment */}
+          {jobStatus === 'payment_claimed' && (
+            <div>
+              <p style={{ color: '#1B5E20', fontWeight: 800, fontSize: 14, margin: '0 0 8px', textAlign: 'center' }}>
+                💸 Customer sent Rs.{activeJob.amount} via UPI
+              </p>
+              <button onClick={confirmPayment} disabled={busy}
+                style={{ width: '100%', background: busy ? '#E0E0E0' : GREEN, color: '#fff', border: 'none', borderRadius: 12, padding: 16, fontWeight: 900, fontSize: 15, cursor: 'pointer', fontFamily: 'Inter, sans-serif', opacity: busy ? 0.7 : 1, boxShadow: busy ? 'none' : '0 4px 12px rgba(37,211,102,.35)' }}>
+                {busy ? '…' : t('✓ Confirm Payment Received')}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
