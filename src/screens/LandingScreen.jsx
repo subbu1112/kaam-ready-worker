@@ -32,9 +32,9 @@ export default function LandingScreen({ setScreen }) {
         </div>
         <div style={{ display:'flex', gap:8 }}>
           <button onClick={() => setScreen('login')}
-            style={{ background:'none', border:'none', padding:'9px 4px',
-              fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:'inherit', color:'#9CA3AF' }}>
-            Skip
+            style={{ background:'none', border:'1.5px solid #E5E7EB', borderRadius:10, padding:'8px 14px',
+              fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit', color:'#6B7280' }}>
+            Sign Up
           </button>
           <button onClick={() => setScreen('login')}
             style={{ background:'#F5F5F5', border:'none', borderRadius:10, padding:'9px 18px',
