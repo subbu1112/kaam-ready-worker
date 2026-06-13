@@ -59,7 +59,6 @@ export default function HomeScreen({ user, profile, showToast }) {
   const [busy,       setBusy]       = useState(false)
   const [upcoming,   setUpcoming]   = useState([])
   const [schedAvail, setSchedAvail] = useState([])
-  const [photoBusy,  setPhotoBusy]  = useState(null)
 
   const timer  = useRef(null)
   const chan    = useRef(null)
@@ -186,21 +185,6 @@ export default function HomeScreen({ user, profile, showToast }) {
     loadScheduled()
   }
 
-  async function uploadJobPhoto(which, file) {
-    if (!activeJob || !file) return
-    setPhotoBusy(which)
-    const path = `${activeJob.id}/${which}.jpg`
-    const { error } = await sb.storage.from('job-photos').upload(path, file, { upsert: true })
-    if (!error) {
-      const { data: pub } = sb.storage.from('job-photos').getPublicUrl(path)
-      const col = which === 'before' ? 'photo_before_url' : 'photo_after_url'
-      await sb.from('bookings').update({ [col]: pub.publicUrl }).eq('id', activeJob.id)
-      setActiveJob(prev => ({ ...prev, [col]: pub.publicUrl }))
-      showToast('Photo saved ✓')
-    } else showToast(error.message)
-    setPhotoBusy(null)
-  }
-
   function getPosition() {
     return new Promise(res => {
       if (!navigator.geolocation) return res(null)
@@ -216,7 +200,14 @@ export default function HomeScreen({ user, profile, showToast }) {
     if (pos) sb.from('workers').update({ lat: pos.lat, lng: pos.lng }).eq('id', user.id).then(() => {})
     const w = { id: user.id, name: profile?.name, skill: profile?.skill, rating: profile?.rating,
       jobs: profile?.total_jobs, ico: '👷', eta: '8 min', dist: '1.0 km', lat: pos?.lat, lng: pos?.lng }
-    await sb.from('bookings').update({ status: 'assigned', worker_id: user.id, worker: w }).eq('id', jobAlert.id)
+    // Guard against race: only update if still searching (not already taken by another worker)
+    const { data: taken } = await sb.from('bookings').update({ status: 'assigned', worker_id: user.id, worker: w })
+      .eq('id', jobAlert.id).eq('status', 'searching').select('id')
+    if (!taken || taken.length === 0) {
+      setJobAlert(null)
+      showToast('Job was already taken — waiting for next one')
+      return
+    }
     setActiveJob({ ...jobAlert, status: 'assigned', worker: w })
     setJobAlert(null)
     showToast('Job accepted! Navigate to customer 🗺️')
@@ -449,19 +440,6 @@ export default function HomeScreen({ user, profile, showToast }) {
               <span style={{ fontSize: 15, fontWeight: 700, color: '#212121' }}>Rs.{jobFloor(jobAlert)}+</span>
             </div>
 
-            <div style={{ height: 4, background: '#F5F5F5', margin: '12px 0 0' }} />
-
-            {/* Actions */}
-            <div style={{ padding: '0 18px 16px' }}>
-              <button onClick={acceptJob}
-                style={{ width: '100%', background: Y, border: 'none', borderRadius: 10, padding: 15, fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'Inter, sans-serif', color: '#412402', marginTop: 12, boxShadow: '0 4px 12px rgba(245,192,0,.3)' }}>
-                Accept Job
-              </button>
-              <p onClick={() => setJobAlert(null)}
-                style={{ textAlign: 'center', fontSize: 13, color: RED, padding: '12px 0 0', cursor: 'pointer', margin: 0, fontWeight: 600 }}>
-                Decline
-              </p>
-            </div>
           </div>
         )}
 
@@ -547,6 +525,24 @@ export default function HomeScreen({ user, profile, showToast }) {
           </div>
         )}
       </div>
+
+      {/* ── Sticky action bar — always visible above TabBar ── */}
+      {jobAlert && !activeJob && (
+        <div style={{ flexShrink: 0, background: '#FFFFFF', borderTop: '2px solid ' + Y, padding: '12px 16px 14px' }}>
+          <button onClick={acceptJob}
+            style={{ width: '100%', background: Y, border: 'none', borderRadius: 14, padding: 18,
+              fontWeight: 900, fontSize: 16, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+              color: '#412402', boxShadow: '0 4px 16px rgba(245,192,0,.4)', marginBottom: 8 }}>
+            ✓ Accept Job
+          </button>
+          <button onClick={() => setJobAlert(null)}
+            style={{ width: '100%', background: 'none', border: '1.5px solid #F5F5F5', borderRadius: 14,
+              padding: '13px 16px', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+              fontFamily: 'Inter, sans-serif', color: RED }}>
+            Decline
+          </button>
+        </div>
+      )}
 
       {/* ── Sticky action bar — always visible above TabBar ── */}
       {activeJob && jobStatus && (
