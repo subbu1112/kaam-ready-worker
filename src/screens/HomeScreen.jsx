@@ -285,9 +285,12 @@ export default function HomeScreen({ user, profile, showToast }) {
             <span style={{ fontSize: 12, fontWeight: 700, color: online ? GREEN : '#9E9E9E' }}>
               {online ? 'Online' : 'Offline'}
             </span>
-            <div onClick={toggleOnline}
-              style={{ width: 52, height: 28, borderRadius: 20, background: online ? GREEN : '#E0E0E0', position: 'relative', cursor: 'pointer', transition: 'background .2s', boxShadow: online ? '0 0 10px rgba(37,211,102,.35)' : 'none' }}>
-              <div style={{ width: 22, height: 22, background: '#fff', borderRadius: '50%', position: 'absolute', top: 3, left: online ? 27 : 3, transition: 'left .2s', boxShadow: '0 1px 4px rgba(0,0,0,.2)' }} />
+            <div style={{ position: 'relative' }}>
+              {online && <div className="wr-online-ring" style={{ position:'absolute', inset:-4, borderRadius:'50%', border:'2px solid rgba(37,211,102,.5)', pointerEvents:'none' }} />}
+              <div onClick={toggleOnline} className={online ? 'wr-online-dot' : ''}
+                style={{ width: 52, height: 28, borderRadius: 20, background: online ? GREEN : '#E0E0E0', position: 'relative', cursor: 'pointer', transition: 'background .3s cubic-bezier(.34,1.56,.64,1)', boxShadow: online ? '0 0 16px rgba(37,211,102,.5)' : 'none' }}>
+                <div style={{ width: 22, height: 22, background: '#fff', borderRadius: '50%', position: 'absolute', top: 3, left: online ? 27 : 3, transition: 'left .3s cubic-bezier(.34,1.56,.64,1)', boxShadow: '0 1px 4px rgba(0,0,0,.2)' }} />
+              </div>
             </div>
           </div>
         </div>
@@ -312,11 +315,11 @@ export default function HomeScreen({ user, profile, showToast }) {
 
         {/* ── Offline state ── */}
         {!online && !activeJob && (
-          <div style={{ background: '#FFFFFF', borderRadius: 20, padding: '36px 24px', textAlign: 'center', border: '1.5px dashed #E0E0E0', boxShadow: '0 2px 8px rgba(0,0,0,.04)' }}>
+          <div className="wr-card-float" style={{ background: '#FFFFFF', borderRadius: 20, padding: '36px 24px', textAlign: 'center', border: '1.5px dashed #E0E0E0', boxShadow: '0 2px 8px rgba(0,0,0,.04)' }}>
             <div style={{ fontSize: 52, marginBottom: 12 }}>😴</div>
             <p style={{ fontWeight: 800, fontSize: 17, color: '#212121' }}>{t('You are Offline')}</p>
             <p style={{ fontSize: 13, color: '#9E9E9E', margin: '8px 0 20px' }}>Toggle the switch above to start receiving jobs</p>
-            <button onClick={toggleOnline}
+            <button onClick={toggleOnline} className="wr-btn-anim"
               style={{ background: Y, border: 'none', borderRadius: 14, padding: '14px 32px', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'Inter, sans-serif', color: '#412402', boxShadow: '0 4px 14px rgba(245,192,0,.35)' }}>
               {t('Go Online Now')}
             </button>
@@ -325,7 +328,7 @@ export default function HomeScreen({ user, profile, showToast }) {
 
         {/* ── Waiting state ── */}
         {online && !jobAlert && !activeJob && (
-          <div style={{ background: '#FFFFFF', borderRadius: 20, padding: '36px 24px', textAlign: 'center', border: '1.5px solid #E8F5E9', boxShadow: '0 2px 8px rgba(0,0,0,.04)' }}>
+          <div className="wr-card-float" style={{ background: '#FFFFFF', borderRadius: 20, padding: '36px 24px', textAlign: 'center', border: '1.5px solid #E8F5E9', boxShadow: '0 2px 8px rgba(0,0,0,.04)' }}>
             <div style={{ fontSize: 52, marginBottom: 12 }}>🟢</div>
             <p style={{ fontWeight: 800, fontSize: 17, color: '#212121' }}>{t('Waiting for jobs…')}</p>
             <p style={{ fontSize: 13, color: '#9E9E9E', marginTop: 6 }}>You will be notified instantly when a job matches</p>
@@ -384,7 +387,7 @@ export default function HomeScreen({ user, profile, showToast }) {
 
         {/* ── New job alert — Rapido style ── */}
         {jobAlert && (
-          <div style={{ background: '#FFFFFF', borderRadius: 22, overflow: 'hidden', border: '2px solid ' + Y, boxShadow: '0 4px 20px rgba(245,192,0,.15)' }}>
+          <div className="wr-job-card-enter wr-job-card-glow" style={{ background: '#FFFFFF', borderRadius: 22, overflow: 'hidden', border: '2px solid ' + Y, boxShadow: '0 4px 20px rgba(245,192,0,.25)' }}>
 
             {/* Service + plate + starting price */}
             <div style={{ padding: '14px 18px 0' }}>
@@ -445,7 +448,7 @@ export default function HomeScreen({ user, profile, showToast }) {
 
         {/* ── Active Job — Rapido style ── */}
         {activeJob && (
-          <div style={{ background: '#FFFFFF', borderRadius: 22, overflow: 'hidden', border: '1.5px solid #E8F5E9', boxShadow: '0 4px 16px rgba(0,0,0,.06)' }}>
+          <div className="wr-screen-slide" style={{ background: '#FFFFFF', borderRadius: 22, overflow: 'hidden', border: '1.5px solid #E8F5E9', boxShadow: '0 4px 16px rgba(0,0,0,.06)' }}>
 
             {/* Service + plate + status */}
             <div style={{ padding: '14px 18px 0' }}>
@@ -529,10 +532,10 @@ export default function HomeScreen({ user, profile, showToast }) {
       {/* ── Sticky action bar — always visible above TabBar ── */}
       {jobAlert && !activeJob && (
         <div style={{ flexShrink: 0, background: '#FFFFFF', borderTop: '2px solid ' + Y, padding: '12px 16px 14px' }}>
-          <button onClick={acceptJob}
+          <button onClick={acceptJob} className="wr-accept-btn wr-btn-anim"
             style={{ width: '100%', background: Y, border: 'none', borderRadius: 14, padding: 18,
               fontWeight: 900, fontSize: 16, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
-              color: '#412402', boxShadow: '0 4px 16px rgba(245,192,0,.4)', marginBottom: 8 }}>
+              color: '#412402', marginBottom: 8 }}>
             ✓ Accept Job
           </button>
           <button onClick={() => setJobAlert(null)}
@@ -551,7 +554,7 @@ export default function HomeScreen({ user, profile, showToast }) {
           {/* Work Done button */}
           {jobStatus === 'in_progress' && !showPrice && (
             <div>
-              <button onClick={() => { setPrice(''); setNote(''); setShowPrice(true) }}
+              <button onClick={() => { setPrice(''); setNote(''); setShowPrice(true) }} className="wr-btn-anim"
                 style={{ width: '100%', background: Y, border: 'none', borderRadius: 12, padding: 16, fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'Inter, sans-serif', color: '#412402', boxShadow: '0 4px 12px rgba(245,192,0,.35)' }}>
                 {t('Work Done — Set Final Price ₹')}
               </button>

@@ -11,6 +11,7 @@ import * as Sentry from '@sentry/react'
 import OneSignal from 'react-onesignal'
 import App from './App'
 import './index.css'
+import './animations.css'
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
