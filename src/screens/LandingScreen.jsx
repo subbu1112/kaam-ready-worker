@@ -15,8 +15,8 @@ const STEPS = [
 
 export default function LandingScreen({ setScreen }) {
   return (
-    <div style={{ minHeight:'100dvh', background:'#FAFAFA', fontFamily:'Inter, system-ui, sans-serif',
-      maxWidth:430, margin:'0 auto', overflowX:'hidden' }}>
+    <div style={{ height:'100dvh', overflowY:'auto', WebkitOverflowScrolling:'touch', background:'#FAFAFA', fontFamily:'Inter, system-ui, sans-serif',
+      maxWidth:430, margin:'0 auto' }}>
 
       {/* Nav */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
