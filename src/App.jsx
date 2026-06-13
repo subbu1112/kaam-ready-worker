@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { sb } from './lib/supabase'
 import OneSignal from 'react-onesignal'
+import LandingScreen  from './screens/LandingScreen'
 import LoginScreen    from './screens/LoginScreen'
 import OTPScreen      from './screens/OTPScreen'
 import OnboardScreen  from './screens/OnboardScreen'
@@ -12,7 +13,7 @@ import Toast          from './components/Toast'
 import TermsModal, { termsAccepted, acceptTerms } from './components/TermsModal'
 
 export default function App() {
-  const [screen,  setScreen]  = useState('login')
+  const [screen,  setScreen]  = useState('landing')
   const [tab,     setTab]     = useState('home')
   const [user,    setUser]    = useState(null)
   const [profile, setProfile] = useState(null)
@@ -47,6 +48,7 @@ export default function App() {
 
   const ctx = { user, profile, setProfile, showToast, setScreen, setTab, loadProfile }
 
+  if (screen==='landing') return <LandingScreen setScreen={setScreen} />
   if (screen==='login')   return <><LoginScreen   {...ctx} />{toast && <Toast msg={toast} />}</>
   if (screen==='otp')     return <><OTPScreen     {...ctx} />{toast && <Toast msg={toast} />}</>
   if (screen==='onboard') return <><OnboardScreen {...ctx} />{toast && <Toast msg={toast} />}</>
