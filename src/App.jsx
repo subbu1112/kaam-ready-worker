@@ -26,7 +26,7 @@ export default function App() {
     })
     sb.auth.onAuthStateChange((_e, session) => {
       if (session?.user) { setUser(session.user); loadProfile(session.user.id) }
-      else { setUser(null); setProfile(null); setScreen('login') }
+      else { setUser(null); setProfile(null); setScreen(prev => prev === 'landing' ? 'landing' : 'login') }
     })
   }, [])
 
