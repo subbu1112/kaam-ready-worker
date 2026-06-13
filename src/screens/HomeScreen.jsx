@@ -84,7 +84,7 @@ export default function HomeScreen({ user, profile, showToast }) {
       clearTimeout(timer.current)
       setJobAlert(null)
     }
-    return () => { if (chan.current) sb.removeChannel(chan.current) }
+    return () => { if (chan.current) sb.removeChannel(chan.current); if (pollRef.current) clearInterval(pollRef.current) }
   }, [online])
 
   useEffect(() => {
@@ -131,9 +131,12 @@ export default function HomeScreen({ user, profile, showToast }) {
   }
 
   function offerJob(b) {
-    if (b.city !== profile?.city) return
-    // Only offer jobs matching this worker's skill/service category
-    if (b.service_id && profile?.skill && b.service_id !== profile.skill) return
+    // City filter — case-insensitive, graceful when city is null
+    if (b.city && profile?.city && b.city.trim().toLowerCase() !== profile.city.trim().toLowerCase()) return
+    // Skill filter — lenient: labour/general workers see all jobs
+    const openSkills = ['labor', 'emerg']
+    const noSkillFilter = !b.service_id || !profile?.skill || openSkills.includes(profile.skill)
+    if (!noSkillFilter && b.service_id !== profile.skill) return
     let delay = 0
     if (b.preferred_worker_id && b.preferred_worker_id !== user.id) delay = 60000
     else if (b.preferred_worker_id === user.id) delay = 0
@@ -152,14 +155,23 @@ export default function HomeScreen({ user, profile, showToast }) {
     delay === 0 ? show() : setTimeout(show, delay)
   }
 
+  const pollRef = useRef(null)
+
   function subscribeToJobs() {
     chan.current = sb.channel('new-jobs-' + profile?.city)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings', filter: 'status=eq.searching' }, payload => offerJob(payload.new))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings', filter: 'status=eq.searching' }, payload => offerJob(payload.new))
       .subscribe()
-    sb.from('bookings').select('*').eq('status', 'searching').eq('city', profile?.city)
-      .gte('created_at', new Date(Date.now() - 3 * 60 * 1000).toISOString())
-      .order('created_at', { ascending: false }).limit(1)
-      .then(({ data }) => { if (data?.[0]) offerJob(data[0]) })
+    // Initial check + polling fallback every 25s (catches realtime misses)
+    const pollJobs = () => {
+      if (!online || activeJob) return
+      sb.from('bookings').select('*').eq('status', 'searching').eq('city', profile?.city)
+        .gte('created_at', new Date(Date.now() - 4 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false }).limit(5)
+        .then(({ data }) => (data || []).forEach(b => offerJob(b)))
+    }
+    pollJobs()
+    pollRef.current = setInterval(pollJobs, 25000)
     loadScheduled()
   }
 
