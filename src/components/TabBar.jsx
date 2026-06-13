@@ -1,5 +1,4 @@
 const Y = '#F5C000'
-const YL = '#2C2600'
 
 const TABS = [
   { id: 'home',     ico: '⚡', lbl: 'Jobs'     },
@@ -10,8 +9,8 @@ const TABS = [
 export default function TabBar({ tab, setTab }) {
   return (
     <div style={{
-      background: '#111114',
-      borderTop: '1px solid #1E1E24',
+      background: '#FFFFFF',
+      borderTop: '1px solid #F0F0F0',
       display: 'flex',
       padding: '6px 8px 16px',
       flexShrink: 0,
@@ -27,21 +26,21 @@ export default function TabBar({ tab, setTab }) {
               flexDirection: 'column',
               alignItems: 'center',
               gap: 3,
-              background: active ? YL : 'none',
-              border: 'none',
+              background: active ? '#FFF8CC' : 'none',
+              border: active ? '1px solid #F5C000' : '1px solid transparent',
               borderRadius: 14,
               cursor: 'pointer',
               padding: '8px 4px 6px',
-              transition: 'background 0.2s',
+              transition: 'background 0.15s',
             }}>
-            <span style={{ fontSize: active ? 22 : 20, lineHeight: 1, filter: active ? 'none' : 'grayscale(0.4)' }}>
+            <span style={{ fontSize: active ? 22 : 20, lineHeight: 1, filter: active ? 'none' : 'grayscale(0.5) opacity(0.7)' }}>
               {tb.ico}
             </span>
             <span style={{
               fontSize: 10,
               fontWeight: 800,
               letterSpacing: 0.2,
-              color: active ? Y : '#555',
+              color: active ? '#412402' : '#9E9E9E',
               fontFamily: 'Inter, sans-serif',
             }}>
               {tb.lbl}
