@@ -30,11 +30,18 @@ export default function LandingScreen({ setScreen }) {
             <span style={{ fontSize:11, color:'#9CA3AF', display:'block', marginTop:-2 }}>For Workers</span>
           </div>
         </div>
-        <button onClick={() => setScreen('login')}
-          style={{ background:'#F5F5F5', border:'none', borderRadius:10, padding:'9px 18px',
-            fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit', color:'#1A1A1A' }}>
-          Login
-        </button>
+        <div style={{ display:'flex', gap:8 }}>
+          <button onClick={() => setScreen('login')}
+            style={{ background:'none', border:'none', padding:'9px 4px',
+              fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:'inherit', color:'#9CA3AF' }}>
+            Skip
+          </button>
+          <button onClick={() => setScreen('login')}
+            style={{ background:'#F5F5F5', border:'none', borderRadius:10, padding:'9px 18px',
+              fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit', color:'#1A1A1A' }}>
+            Login
+          </button>
+        </div>
       </div>
 
       {/* Hero */}
