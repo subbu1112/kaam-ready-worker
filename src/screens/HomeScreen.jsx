@@ -226,11 +226,12 @@ export default function HomeScreen({ user, profile, showToast }) {
     const floor = jobFloor(activeJob)
     if (!p || p < floor) { showToast('Price cannot be below the minimum of Rs.' + floor); return }
     setBusy(true)
-    const { error } = await sb.from('bookings').update({
+    const { data: updated, error } = await sb.from('bookings').update({
       status: 'priced', amount: p, price_note: note.trim() || null, priced_at: new Date().toISOString(),
-    }).eq('id', activeJob.id)
+    }).eq('id', activeJob.id).select('id')
     setBusy(false)
     if (error) { showToast(error.message); return }
+    if (!updated || updated.length === 0) { showToast('Could not set price — check your connection and try again'); return }
     setActiveJob(prev => ({ ...prev, status: 'priced', amount: p, price_note: note.trim() || null }))
     setShowPrice(false)
     showToast('Price sent — waiting for customer to pay via UPI 💳')
@@ -246,10 +247,13 @@ export default function HomeScreen({ user, profile, showToast }) {
       payment_confirmed_at: new Date().toISOString(), completed_at: new Date().toISOString(),
     }).eq('id', activeJob.id)
     if (!error) {
+      // Fetch fresh worker data to avoid stale wallet_balance from initial load
+      const { data: fresh } = await sb.from('workers').select('wallet_balance, commission_due, total_jobs').eq('id', user.id).single()
+      const base = fresh || {}
       await sb.from('workers').update({
-        wallet_balance: (profile?.wallet_balance || 0) + amt - fee,
-        commission_due: (profile?.commission_due || 0) + fee,
-        total_jobs: (profile?.total_jobs || 0) + 1,
+        wallet_balance: (base.wallet_balance || 0) + amt - fee,
+        commission_due: (base.commission_due || 0) + fee,
+        total_jobs: (base.total_jobs || 0) + 1,
       }).eq('id', user.id)
       setTodayEarn(e => e + amt)
       setTodayJobs(j => j + 1)
@@ -557,7 +561,7 @@ export default function HomeScreen({ user, profile, showToast }) {
               {jobStatus === 'in_progress' && !showPrice && (
                 <button onClick={() => { setPrice(''); setNote(''); setShowPrice(true) }}
                   style={{ width: '100%', background: Y, border: 'none', borderRadius: 10, padding: 15, fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'Inter, sans-serif', color: '#412402', marginTop: 12, boxShadow: '0 4px 12px rgba(245,192,0,.3)' }}>
-                  {t('Work Done — Set Final Price Rs.')}
+                  {t('Work Done — Set Final Price ₹')}
                 </button>
               )}
 
@@ -610,7 +614,7 @@ export default function HomeScreen({ user, profile, showToast }) {
                   <p style={{ color: '#2E7D32', fontSize: 13, margin: '6px 0 16px' }}>Check your UPI app, then confirm below</p>
                   <button onClick={confirmPayment} disabled={busy}
                     style={{ width: '100%', background: busy ? '#E0E0E0' : GREEN, color: '#fff', border: 'none', borderRadius: 10, padding: 16, fontWeight: 900, fontSize: 15, cursor: 'pointer', fontFamily: 'Inter, sans-serif', opacity: busy ? 0.7 : 1, boxShadow: busy ? 'none' : '0 4px 12px rgba(37,211,102,.35)' }}>
-                    {busy ? '…' : t('Confirm Payment Received')}
+                    {busy ? '…' : t('✓ Confirm Payment Received')}
                   </button>
                 </div>
               )}

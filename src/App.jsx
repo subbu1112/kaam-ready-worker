@@ -52,7 +52,7 @@ export default function App() {
   if (screen==='onboard') return <><OnboardScreen {...ctx} />{toast && <Toast msg={toast} />}</>
 
   return (
-    <div style={{ height:'100vh', display:'flex', flexDirection:'column', background:'#0A0A0A', maxWidth:430, margin:'0 auto', overflow:'hidden', position:'relative' }}>
+    <div style={{ height:'100vh', display:'flex', flexDirection:'column', background:'#FAFAFA', maxWidth:430, margin:'0 auto', overflow:'hidden', position:'relative' }}>
       {tab==='home'     && <HomeScreen     {...ctx} />}
       {tab==='earnings' && <EarningsScreen {...ctx} />}
       {tab==='profile'  && <ProfileScreen  {...ctx} />}
