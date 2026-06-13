@@ -211,7 +211,7 @@ export default function LandingScreen({ setScreen }) {
           <p style={{ fontWeight:700, fontSize:13, color:DARK, margin:'0 0 2px' }}>Need home services?</p>
           <p style={{ fontSize:11, color:'#9CA3AF', margin:0 }}>Use the customer app</p>
         </div>
-        <a href="https://kaam-ready-customer.vercel.app" target="_blank" rel="noreferrer"
+        <a href="https://thekaamready.in" target="_blank" rel="noreferrer"
           style={{ background:DARK, color:'#FFF', textDecoration:'none', borderRadius:10,
             padding:'8px 14px', fontWeight:700, fontSize:12, flexShrink:0 }}>
           Open →
