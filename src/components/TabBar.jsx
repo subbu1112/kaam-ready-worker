@@ -12,7 +12,7 @@ export default function TabBar({ tab, setTab }) {
       background: '#FFFFFF',
       borderTop: '1px solid #F0F0F0',
       display: 'flex',
-      padding: '6px 8px 16px',
+      padding: '6px 8px calc(16px + env(safe-area-inset-bottom))',
       flexShrink: 0,
       gap: 4,
     }}>

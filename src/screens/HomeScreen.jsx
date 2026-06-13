@@ -122,6 +122,8 @@ export default function HomeScreen({ user, profile, showToast }) {
 
   function offerJob(b) {
     if (b.city !== profile?.city) return
+    // Only offer jobs matching this worker's skill/service category
+    if (b.service_id && profile?.skill && b.service_id !== profile.skill) return
     let delay = 0
     if (b.preferred_worker_id && b.preferred_worker_id !== user.id) delay = 60000
     else if (b.preferred_worker_id === user.id) delay = 0
@@ -154,6 +156,7 @@ export default function HomeScreen({ user, profile, showToast }) {
   async function loadScheduled() {
     const [avail, mine] = await Promise.all([
       sb.from('bookings').select('*').eq('status', 'scheduled').is('worker_id', null).eq('city', profile?.city)
+        .eq('service_id', profile?.skill)
         .gte('scheduled_at', new Date().toISOString()).order('scheduled_at').limit(5),
       sb.from('bookings').select('*').eq('worker_id', user.id).eq('is_scheduled', true).eq('status', 'assigned')
         .gte('scheduled_at', new Date(Date.now() - 30 * 60 * 1000).toISOString()).order('scheduled_at').limit(5),
@@ -317,7 +320,7 @@ export default function HomeScreen({ user, profile, showToast }) {
       </div>
 
       {/* ── Scroll body ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 12, WebkitOverflowScrolling: 'touch' }}>
 
         {/* ── Offline state ── */}
         {!online && !activeJob && (
