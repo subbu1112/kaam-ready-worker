@@ -233,7 +233,7 @@ export default function HomeScreen({ user, profile, showToast }) {
     setBusy(true)
     const { data: updated, error } = await sb.from('bookings').update({
       status: 'priced', amount: p, price_note: note.trim() || null, priced_at: new Date().toISOString(),
-    }).eq('id', activeJob.id).select('id')
+    }).eq('id', activeJob.id).eq('worker_id', user.id).eq('status','assigned').select('id')
     setBusy(false)
     if (error) { showToast(error.message); return }
     if (!updated || updated.length === 0) { showToast('Could not set price — check your connection and try again'); return }
@@ -248,7 +248,7 @@ export default function HomeScreen({ user, profile, showToast }) {
     if (!activeJob || busy) return
     if (!window.confirm('Cancel this job? The customer will be notified.')) return
     setBusy(true)
-    await sb.from('bookings').update({ status: 'searching', worker_id: null, worker: null }).eq('id', activeJob.id)
+    await sb.from('bookings').update({ status: 'searching', worker_id: null, worker: null }).eq('id', activeJob.id).eq('worker_id', user.id)
     setBusy(false)
     setActiveJob(null); setPrice(''); setNote(''); setShowPrice(false)
     showToast('Job cancelled — customer will be re-matched')
