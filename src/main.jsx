@@ -1,3 +1,10 @@
+// Capture install prompt before anything else mounts
+window.__pwaPrompt = null
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault()
+  window.__pwaPrompt = e
+})
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import * as Sentry from '@sentry/react'
