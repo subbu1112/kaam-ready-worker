@@ -7,17 +7,21 @@ function PhoneMockup() {
   const [installed, setInstalled] = useState(
     window.matchMedia('(display-mode: standalone)').matches
   )
+  const [showInstallModal, setShowInstallModal] = useState(false)
 
   useEffect(() => {
-    window.addEventListener('appinstalled', () => setInstalled(true))
+    window.addEventListener('appinstalled', () => { setInstalled(true); setShowInstallModal(false) })
   }, [])
 
   async function handleInstall() {
     const prompt = window.__pwaPrompt
-    if (!prompt) return
-    prompt.prompt()
-    const { outcome } = await prompt.userChoice
-    if (outcome === 'accepted') { setInstalled(true); window.__pwaPrompt = null }
+    if (prompt) {
+      prompt.prompt()
+      const { outcome } = await prompt.userChoice
+      if (outcome === 'accepted') { setInstalled(true); window.__pwaPrompt = null }
+    } else {
+      setShowInstallModal(true)
+    }
   }
 
   return (
@@ -99,17 +103,21 @@ export default function LandingScreen({ setScreen }) {
   const [installed, setInstalled] = useState(
     window.matchMedia('(display-mode: standalone)').matches
   )
+  const [showInstallModal, setShowInstallModal] = useState(false)
 
   useEffect(() => {
-    window.addEventListener('appinstalled', () => setInstalled(true))
+    window.addEventListener('appinstalled', () => { setInstalled(true); setShowInstallModal(false) })
   }, [])
 
   async function handleInstall() {
     const prompt = window.__pwaPrompt
-    if (!prompt) return
-    prompt.prompt()
-    const { outcome } = await prompt.userChoice
-    if (outcome === 'accepted') { setInstalled(true); window.__pwaPrompt = null }
+    if (prompt) {
+      prompt.prompt()
+      const { outcome } = await prompt.userChoice
+      if (outcome === 'accepted') { setInstalled(true); window.__pwaPrompt = null }
+    } else {
+      setShowInstallModal(true)
+    }
   }
 
   return (
@@ -317,6 +325,53 @@ export default function LandingScreen({ setScreen }) {
           </div>
         </div>
       </footer>
+
+      {/* PWA Install Guide Modal */}
+      {showInstallModal && (
+        <div onClick={() => setShowInstallModal(false)} style={{ position:'fixed', inset:0,
+          background:'rgba(0,0,0,.6)', zIndex:200, display:'flex', alignItems:'flex-end',
+          justifyContent:'center', backdropFilter:'blur(4px)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:'#FFFFFF', borderRadius:'24px 24px 0 0',
+            width:'100%', maxWidth:480, padding:'24px 24px 40px' }}>
+            <div style={{ width:48, height:4, background:'#E5E7EB', borderRadius:4,
+              margin:'0 auto 20px' }} />
+            <p style={{ fontWeight:900, fontSize:20, color:DARK, margin:'0 0 6px' }}>
+              Install Kaam Ready
+            </p>
+            <p style={{ fontSize:13, color:'#9CA3AF', margin:'0 0 24px' }}>
+              Follow these steps to add the app to your home screen
+            </p>
+            {/* Android Chrome steps */}
+            <div style={{ display:'flex', flexDirection:'column', gap:14, marginBottom:24 }}>
+              {[
+                { n:'1', ico:'🌐', text:'Open this page in Chrome browser' },
+                { n:'2', ico:'⋮',  text:'Tap the three-dot menu (⋮) at the top right', bold:true },
+                { n:'3', ico:'➕', text:'Tap "Add to Home screen"',            bold:true },
+                { n:'4', ico:'✅', text:'Tap "Add" — app will appear on your home screen' },
+              ].map(s => (
+                <div key={s.n} style={{ display:'flex', alignItems:'center', gap:14 }}>
+                  <div style={{ width:38, height:38, borderRadius:12, background:Y,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontWeight:900, fontSize:16, color:DARK, flexShrink:0 }}>
+                    {s.ico === '⋮' ? <span style={{letterSpacing:-2}}>···</span> : s.ico}
+                  </div>
+                  <p style={{ fontSize:14, color:DARK, margin:0, fontWeight: s.bold ? 700 : 400 }}>{s.text}</p>
+                </div>
+              ))}
+            </div>
+            <div style={{ background:'#F5F5F8', borderRadius:14, padding:'12px 16px', marginBottom:16 }}>
+              <p style={{ fontSize:12, color:'#6B7280', margin:0, lineHeight:1.6 }}>
+                💡 <strong>Tip:</strong> Make sure you're using Chrome on Android for the best experience. The app will work like a native app after installing.
+              </p>
+            </div>
+            <button onClick={() => setShowInstallModal(false)}
+              style={{ width:'100%', background:DARK, color:Y, border:'none', borderRadius:14,
+                padding:'15px', fontWeight:800, fontSize:15, cursor:'pointer', fontFamily:'inherit' }}>
+              Got it ✓
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
