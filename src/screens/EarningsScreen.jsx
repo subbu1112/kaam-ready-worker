@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { sb } from '../lib/supabase'
-import { Y, YD } from '../theme'
+const Y='#F5C000',YD='#B8900A'
 export default function EarningsScreen({ user }) {
   const [period,   setPeriod]   = useState('This Month')
   const [bookings, setBookings] = useState([])
@@ -30,7 +30,7 @@ export default function EarningsScreen({ user }) {
       </div>
       <div style={{ display:'flex', gap:8, padding:'12px 16px 4px', flexShrink:0 }}>
         {['Today','This Week','This Month'].map(p => (
-          <button key={p} type="button" onClick={() => setPeriod(p)}
+          <button key={p} onClick={() => setPeriod(p)}
             style={{ padding:'6px 14px', borderRadius:20, border:'1.5px solid '+(period===p?Y:'#2a2a2a'), background:period===p?Y:'#111', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', color:period===p?'#000':'#888' }}>
             {p}
           </button>

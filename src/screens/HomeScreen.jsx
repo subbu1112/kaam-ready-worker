@@ -3,7 +3,7 @@ import { sb } from '../lib/supabase'
 import MapView from '../components/MapView'
 import { floorFor, COMMISSION } from '../constants'
 import { t } from '../i18n'
-import { Y, YL, GREEN, RED } from '../theme'
+const Y='#F5C000',YL='#FFF8D6',GREEN='#22c55e',RED='#ef4444'
 export default function HomeScreen({ user, profile, showToast }) {
   const [online,    setOnline]    = useState(() => localStorage.getItem('kr_worker_online') === 'true')
   const [jobAlert,  setJobAlert]  = useState(null)
@@ -30,10 +30,10 @@ export default function HomeScreen({ user, profile, showToast }) {
       })
   }, [user?.id])
   useEffect(() => {
-    if(online && profile?.city) subscribeToJobs()
+    if(online) subscribeToJobs()
     else { if(chan.current) sb.removeChannel(chan.current); clearTimeout(timer.current); setJobAlert(null) }
-    return () => { if(chan.current) sb.removeChannel(chan.current); if(pollRef.current) clearInterval(pollRef.current) }
-  }, [online, profile?.city])
+    return () => { if(chan.current) sb.removeChannel(chan.current) }
+  }, [online])
   useEffect(() => {
     if (!user?.id) return
     sb.from('workers').update({ is_online: online }).eq('id', user.id).then(() => {})
@@ -196,9 +196,9 @@ export default function HomeScreen({ user, profile, showToast }) {
           <h1 style={{ color:Y, fontSize:20, fontWeight:800 }}>Kaam Ready ⚡</h1>
           <p style={{ color:'#636366', fontSize:12 }}>{profile?.skill} · {profile?.city}</p>
         </div>
-        <button type="button" aria-label={online ? 'Go Offline' : 'Go Online'} aria-pressed={online} onClick={toggleOnline} style={{ width:52, height:28, borderRadius:20, background:online?GREEN:'#3A3A3C', position:'relative', cursor:'pointer', transition:'background .2s', border:'none', padding:0 }}>
+        <div onClick={toggleOnline} style={{ width:52, height:28, borderRadius:20, background:online?GREEN:'#3A3A3C', position:'relative', cursor:'pointer', transition:'background .2s' }}>
           <div style={{ width:22, height:22, background:'#fff', borderRadius:'50%', position:'absolute', top:3, left:online?27:3, transition:'left .2s', boxShadow:'0 1px 4px rgba(0,0,0,.3)' }} />
-        </button>
+        </div>
       </div>
       <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:12 }}>
         {!online && !activeJob && (
@@ -206,7 +206,7 @@ export default function HomeScreen({ user, profile, showToast }) {
             <div style={{ fontSize:44, marginBottom:12 }}>😴</div>
             <p style={{ fontWeight:800, fontSize:16, color:'#fff' }}>{t('You are Offline')}</p>
             <p style={{ fontSize:13, color:'#555', margin:'6px 0 18px' }}>Toggle the switch above to start receiving jobs</p>
-            <button type="button" onClick={toggleOnline} style={{ background:Y, border:'none', borderRadius:14, padding:'14px 28px', fontWeight:800, fontSize:14, cursor:'pointer' }}>{t('Go Online Now')}</button>
+            <button onClick={toggleOnline} style={{ background:Y, border:'none', borderRadius:14, padding:'14px 28px', fontWeight:800, fontSize:14, cursor:'pointer' }}>{t('Go Online Now')}</button>
           </div>
         )}
         {online && !jobAlert && !activeJob && (
@@ -226,7 +226,7 @@ export default function HomeScreen({ user, profile, showToast }) {
                     <p style={{ color:'#fff', fontSize:13, fontWeight:700 }}>{b.service} · {b.customer_name||''}</p>
                     <p style={{ color:'#636366', fontSize:11, marginTop:2 }}>{new Date(b.scheduled_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})} · {b.address}</p>
                   </div>
-                  <button type="button" onClick={() => setActiveJob(b)}
+                  <button onClick={() => setActiveJob(b)}
                     style={{ background:Y, border:'none', borderRadius:10, padding:'8px 14px', fontWeight:800, fontSize:12, cursor:'pointer', flexShrink:0 }}>{t('Start Job')}</button>
                 </div>
               </div>
@@ -242,7 +242,7 @@ export default function HomeScreen({ user, profile, showToast }) {
                   <p style={{ color:'#fff', fontSize:13, fontWeight:700 }}>{b.service}</p>
                   <p style={{ color:'#636366', fontSize:11, marginTop:2 }}>{new Date(b.scheduled_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</p>
                 </div>
-                <button type="button" onClick={() => acceptScheduled(b)}
+                <button onClick={() => acceptScheduled(b)}
                   style={{ background:'#22c55e', color:'#fff', border:'none', borderRadius:10, padding:'8px 14px', fontWeight:800, fontSize:12, cursor:'pointer', flexShrink:0 }}>✓ {t('Accept')}</button>
               </div>
             ))}
@@ -262,8 +262,8 @@ export default function HomeScreen({ user, profile, showToast }) {
               <span style={{ color:Y, fontSize:18, fontWeight:800 }}>from ₹{jobFloor(jobAlert)}</span>
             </div>
             <div style={{ display:'flex', gap:8 }}>
-              <button type="button" onClick={acceptJob} style={{ flex:1, background:GREEN, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer' }}>✓ {t('Accept')}</button>
-              <button type="button" onClick={() => setJobAlert(null)} style={{ flex:1, background:RED, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer' }}>✕ {t('Decline')}</button>
+              <button onClick={acceptJob} style={{ flex:1, background:GREEN, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer' }}>✓ {t('Accept')}</button>
+              <button onClick={() => setJobAlert(null)} style={{ flex:1, background:RED, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer' }}>✕ {t('Decline')}</button>
             </div>
           </div>
         )}
@@ -287,10 +287,10 @@ export default function HomeScreen({ user, profile, showToast }) {
                 workerLat={activeJob.worker?.lat || profile?.lat} workerLng={activeJob.worker?.lng || profile?.lng}
                 style={{ borderRadius:12, height:160, overflow:'hidden', marginTop:10 }} />
               <div style={{ display:'flex', gap:8, marginTop:10 }}>
-                <button type="button" onClick={navigateToCustomer} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>🗺️ {t('Directions')}</button>
+                <button onClick={navigateToCustomer} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>🗺️ {t('Directions')}</button>
                 {activeJob.customer_phone
                   ? <a href={'tel:+91'+activeJob.customer_phone} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer', textAlign:'center', textDecoration:'none', color:'#000' }}>📞 {t('Call Customer')}</a>
-                  : <button type="button" onClick={() => showToast('Customer phone not available for this booking')} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>📞 Call</button>}
+                  : <button onClick={() => showToast('Customer phone not available for this booking')} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>📞 Call</button>}
               </div>
             </>}
             {activeJob.status!=='priced' && !activeJob.payment_status && (
@@ -305,7 +305,7 @@ export default function HomeScreen({ user, profile, showToast }) {
               </div>
             )}
             {activeJob.status!=='priced' && !showPrice && (
-              <button type="button" onClick={() => { setPrice(''); setNote(''); setShowPrice(true) }} style={{ width:'100%', background:GREEN, color:'#fff', border:'none', borderRadius:14, padding:15, fontWeight:800, fontSize:14, cursor:'pointer', marginTop:10 }}>{t('Work Done — Set Final Price ₹')}</button>
+              <button onClick={() => { setPrice(''); setNote(''); setShowPrice(true) }} style={{ width:'100%', background:GREEN, color:'#fff', border:'none', borderRadius:14, padding:15, fontWeight:800, fontSize:14, cursor:'pointer', marginTop:10 }}>{t('Work Done — Set Final Price ₹')}</button>
             )}
             {activeJob.status!=='priced' && showPrice && (
               <div style={{ background:'#1C1C1E', borderRadius:14, padding:14, marginTop:10 }}>
@@ -316,8 +316,8 @@ export default function HomeScreen({ user, profile, showToast }) {
                 <input value={note} onChange={e => setNote(e.target.value.slice(0,120))} placeholder="Why this price? e.g. extra wiring replaced"
                   style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:12, fontSize:13, color:'#fff', outline:'none', fontFamily:'inherit', marginBottom:10 }} />
                 <div style={{ display:'flex', gap:8 }}>
-                  <button type="button" onClick={() => setShowPrice(false)} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:10, padding:12, fontWeight:700, fontSize:13, cursor:'pointer' }}>Cancel</button>
-                  <button type="button" onClick={submitPrice} disabled={busy} style={{ flex:2, background:Y, border:'none', borderRadius:10, padding:12, fontWeight:800, fontSize:13, cursor:'pointer', opacity:busy?.6:1 }}>{busy?'...':t('Send to Customer →')}</button>
+                  <button onClick={() => setShowPrice(false)} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:10, padding:12, fontWeight:700, fontSize:13, cursor:'pointer' }}>Cancel</button>
+                  <button onClick={submitPrice} disabled={busy} style={{ flex:2, background:Y, border:'none', borderRadius:10, padding:12, fontWeight:800, fontSize:13, cursor:'pointer', opacity:busy?.6:1 }}>{busy?'...':t('Send to Customer →')}</button>
                 </div>
               </div>
             )}
@@ -326,7 +326,7 @@ export default function HomeScreen({ user, profile, showToast }) {
                 <div style={{ fontSize:30, marginBottom:8 }}>⏳</div>
                 <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>₹{activeJob.amount} sent to customer</p>
                 <p style={{ color:'#636366', fontSize:12, marginTop:4 }}>Waiting for them to pay via UPI...</p>
-                <button type="button" onClick={() => { setPrice(String(activeJob.amount||'')); setNote(activeJob.price_note||''); setActiveJob(p=>({...p,status:'assigned'})); setShowPrice(true) }}
+                <button onClick={() => { setPrice(String(activeJob.amount||'')); setNote(activeJob.price_note||''); setActiveJob(p=>({...p,status:'assigned'})); setShowPrice(true) }}
                   style={{ marginTop:12, background:'none', border:'1px solid #2a2a2a', borderRadius:10, color:'#636366', padding:'8px 16px', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>Edit price</button>
               </div>
             )}
@@ -335,7 +335,7 @@ export default function HomeScreen({ user, profile, showToast }) {
                 <div style={{ fontSize:30, marginBottom:8 }}>💸</div>
                 <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>Customer paid ₹{activeJob.amount} via UPI</p>
                 <p style={{ color:'#9ca3af', fontSize:12, margin:'4px 0 12px' }}>Check your UPI app, then confirm below</p>
-                <button type="button" onClick={confirmPayment} disabled={busy} style={{ width:'100%', background:GREEN, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer', opacity:busy?.6:1 }}>
+                <button onClick={confirmPayment} disabled={busy} style={{ width:'100%', background:GREEN, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer', opacity:busy?.6:1 }}>
                   {busy?'...':t('✓ Confirm Payment Received')}
                 </button>
               </div>

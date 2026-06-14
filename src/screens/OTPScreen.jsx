@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { sb } from '../lib/supabase'
-import { Y } from '../theme'
+const Y = '#F5C000'
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY
 
@@ -43,7 +43,7 @@ export default function OTPScreen({ setScreen, showToast }) {
   return (
     <div style={{ height:'100vh', background:'#0A0A0A', maxWidth:430, margin:'0 auto', width:'100%', display:'flex', flexDirection:'column' }}>
       <div style={{ background:Y, padding:'16px 24px 20px' }}>
-        <button type="button" onClick={() => setScreen('login')} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer' }}>←</button>
+        <button onClick={() => setScreen('login')} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer' }}>←</button>
         <h2 style={{ fontWeight:800, fontSize:20, marginTop:8 }}>Enter OTP</h2>
         <p style={{ fontSize:13, color:'rgba(0,0,0,.6)' }}>6-digit code sent to your number</p>
       </div>
@@ -58,7 +58,7 @@ export default function OTPScreen({ setScreen, showToast }) {
                   fontFamily:'inherit', background:'#1a1a1a', color:'#fff' }} />
             ))}
           </div>
-          <button type="button" onClick={verify} disabled={busy}
+          <button onClick={verify} disabled={busy}
             style={{ width:'100%', background:Y, border:'none', borderRadius:14, padding:16, fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'inherit', opacity:busy?0.6:1 }}>
             {busy ? 'Verifying...' : 'Verify & Enter →'}
           </button>

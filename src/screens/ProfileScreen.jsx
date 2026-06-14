@@ -3,7 +3,9 @@ import { sb } from '../lib/supabase'
 import AvatarUpload from '../components/AvatarUpload'
 import { floorFor } from '../constants'
 import { getLang, setLang } from '../i18n'
-import { Y, YL, GREEN } from '../theme'
+import JobHistoryScreen from './JobHistoryScreen'
+import SettingsScreen from './SettingsScreen'
+const Y='#F5C000', YL='#FFF8D6', GREEN='#22c55e'
 
 const ACHIEVEMENTS = [
   { id:'first_job',   ico:'🎯', title:'First Job',      desc:'Completed your first job',         threshold: j => j >= 1    },
@@ -20,11 +22,11 @@ function AchievementsModal({ profile, onClose }) {
   const rating = profile?.rating       || 5.0
   const trust  = profile?.trust_score  || 60
   return (
-    <div role="dialog" aria-modal="true" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.85)', zIndex:999, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.85)', zIndex:999, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
       <div style={{ background:'#111', borderRadius:'24px 24px 0 0', width:'100%', maxWidth:430, padding:'20px 20px 40px', maxHeight:'80vh', overflowY:'auto' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
           <p style={{ fontWeight:800, fontSize:18, color:'#fff' }}>🏆 Achievements</p>
-          <button type="button" onClick={onClose} style={{ background:'#1a1a1a', border:'none', borderRadius:10, padding:'6px 12px', color:'#fff', cursor:'pointer', fontFamily:'inherit' }}>Close</button>
+          <button onClick={onClose} style={{ background:'#1a1a1a', border:'none', borderRadius:10, padding:'6px 12px', color:'#fff', cursor:'pointer', fontFamily:'inherit' }}>Close</button>
         </div>
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {ACHIEVEMENTS.map(a => {
@@ -64,11 +66,11 @@ function BankModal({ profile, onClose, showToast }) {
     onClose()
   }
   return (
-    <div role="dialog" aria-modal="true" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.85)', zIndex:999, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.85)', zIndex:999, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
       <div style={{ background:'#111', borderRadius:'24px 24px 0 0', width:'100%', maxWidth:430, padding:'20px 20px 40px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
           <p style={{ fontWeight:800, fontSize:18, color:'#fff' }}>💳 Payments & Pricing</p>
-          <button type="button" onClick={onClose} style={{ background:'#1a1a1a', border:'none', borderRadius:10, padding:'6px 12px', color:'#fff', cursor:'pointer', fontFamily:'inherit' }}>Close</button>
+          <button onClick={onClose} style={{ background:'#1a1a1a', border:'none', borderRadius:10, padding:'6px 12px', color:'#fff', cursor:'pointer', fontFamily:'inherit' }}>Close</button>
         </div>
         <p style={{ color:'#555', fontSize:13, marginBottom:8 }}>Customers pay this UPI ID directly after each job</p>
         <input value={upi} onChange={e => setUpi(e.target.value)}
@@ -76,7 +78,7 @@ function BankModal({ profile, onClose, showToast }) {
           style={{ width:'100%', border:'1.5px solid #2a2a2a', borderRadius:12, padding:'13px 14px',
             fontSize:14, outline:'none', fontFamily:'inherit', background:'#1a1a1a', color:'#fff', boxSizing:'border-box', marginBottom:14 }} />
         <p style={{ color:'#555', fontSize:13, marginBottom:14 }}>Job minimum for your skill is fixed at ₹{floor}</p>
-        <button type="button" onClick={save} disabled={saving}
+        <button onClick={save} disabled={saving}
           style={{ width:'100%', background:Y, border:'none', borderRadius:14, padding:16, fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'inherit', opacity:saving?0.6:1 }}>
           {saving ? 'Saving...' : 'Save →'}
         </button>
@@ -85,9 +87,16 @@ function BankModal({ profile, onClose, showToast }) {
   )
 }
 
-export default function ProfileScreen({ profile, showToast }) {
-  const [modal, setModal] = useState(null)
+export default function ProfileScreen({ user, profile, showToast }) {
+  const [modal,     setModal]    = useState(null)
+  const [subscreen, setSubscreen] = useState(null) // null | 'history' | 'settings'
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || null)
+
+  // Sub-screens (full takeover)
+  if (subscreen === 'history')
+    return <JobHistoryScreen user={user} profile={profile} onBack={() => setSubscreen(null)} showToast={showToast} />
+  if (subscreen === 'settings')
+    return <SettingsScreen user={user} profile={profile} onBack={() => setSubscreen(null)} showToast={showToast} />
   const jobs   = profile?.total_jobs  || 0
   const rating = profile?.rating      || 5.0
   const trust  = profile?.trust_score || 60
@@ -106,11 +115,11 @@ export default function ProfileScreen({ profile, showToast }) {
   const menus = [
     ['🌐', getLang()==='kn' ? 'Language: ಕನ್ನಡ' : 'Language: English', getLang()==='kn' ? 'EN?' : 'ಕನ್ನಡ?', toggleLang],
     ['🎁','Refer & Earn ₹100', profile?.referral_code || ('KR'+(profile?.phone||'').slice(-4)), copyReferral],
-    ['📋','Job History',    null,     () => showToast('Coming soon!')],
+    ['📋','Job History',    null,     () => setSubscreen('history')],
     ['🏆','Achievements',  earned+' earned', () => setModal('achievements')],
     ['💳','Payments & Pricing',  profile?.upi_id ? '✓ Set' : 'Add UPI', () => setModal('bank')],
-    ['📞','Support',       null,     () => showToast('Call 1800-KR-HELP')],
-    ['⚙️','Settings',      null,     () => showToast('Coming soon!')],
+    ['📞','Support',       null,     () => window.open('https://wa.me/918012345678?text=Hi+Kaam+Ready+I+need+help', '_blank')],
+    ['⚙️','Settings',      null,     () => setSubscreen('settings')],
   ]
 
   return (
@@ -152,21 +161,9 @@ export default function ProfileScreen({ profile, showToast }) {
 
         <div style={{ background:'#111', borderRadius:16, border:'1px solid #1a1a1a', overflow:'hidden' }}>
           {menus.map(([ico,lb,badge,fn]) => (
-            <button key={lb} type="button" onClick={fn}
+            <button key={lb} onClick={fn}
               style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'none', border:'none', borderBottom:'1px solid #1a1a1a', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
               <div style={{ width:36, height:36, borderRadius:10, background:YL, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>{ico}</div>
               <span style={{ fontSize:15, fontWeight:500, color:'#fff', flex:1 }}>{lb}</span>
               {badge && <span style={{ fontSize:11, color:'#888', marginRight:4 }}>{badge}</span>}
-              <span style={{ color:'#333', fontSize:18 }}>›</span>
-            </button>
-          ))}
-        </div>
-        <button type="button" onClick={() => sb.auth.signOut()}
-          style={{ width:'100%', background:'transparent', border:'2px solid #fecaca', borderRadius:14, padding:16, color:'#ef4444', fontWeight:800, fontSize:14, cursor:'pointer', fontFamily:'inherit' }}>
-          Sign Out
-        </button>
-        <p style={{ textAlign:'center', fontSize:12, color:'#333', paddingBottom:8 }}>Kaam Ready Worker v1.0 · Karnataka 🇮🇳</p>
-      </div>
-    </div>
-  )
-}
+    

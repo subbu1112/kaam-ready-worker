@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { sb } from '../lib/supabase'
 import { floorFor } from '../constants'
-import { Y, YL } from '../theme'
+const Y='#F5C000', YL='#FFF8D6'
 const SKILLS=[{id:'elec',ico:'⚡',lbl:'Electrician'},{id:'plumb',ico:'🔧',lbl:'Plumber'},{id:'clean',ico:'🧹',lbl:'Cleaner'},{id:'carpen',ico:'🪚',lbl:'Carpenter'},{id:'paint',ico:'🎨',lbl:'Painter'},{id:'mech',ico:'🔩',lbl:'Mechanic'},{id:'pest',ico:'🐛',lbl:'Pest Control'},{id:'labor',ico:'👷',lbl:'Labourer'}]
 const CITIES=['Bengaluru','Mysuru','Mangaluru','Hubballi','Belagavi','Tumakuru']
 
@@ -39,11 +39,11 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
   async function uploadKYC(uid) {
     const uploads = []
     if (aaFront) {
-      const { error } = await sb.storage.from('kyc').upload(`${uid}/aadhaar-front.jpg`, aaFront, { upsert: true })
+      const { data, error } = await sb.storage.from('kyc').upload(`${uid}/aadhaar-front.jpg`, aaFront, { upsert: true })
       if (!error) uploads.push('front')
     }
     if (aaBack) {
-      const { error } = await sb.storage.from('kyc').upload(`${uid}/aadhaar-back.jpg`, aaBack, { upsert: true })
+      const { data, error } = await sb.storage.from('kyc').upload(`${uid}/aadhaar-back.jpg`, aaBack, { upsert: true })
       if (!error) uploads.push('back')
     }
     return uploads.length > 0
@@ -148,7 +148,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
                 <p style={{ fontSize:12, fontWeight:700, color:'#555', marginBottom:8 }}>PRIMARY SKILL</p>
                 <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                   {skills.map(id => { const s=SKILLS.find(x=>x.id===id); return (
-                    <button key={id} type="button" onClick={() => setPrimary(id)}
+                    <button key={id} onClick={() => setPrimary(id)}
                       style={{ background:primary===id?Y:'#f9f9f9', border:'2px solid '+(primary===id?Y:'#eee'), borderRadius:10, padding:'7px 14px', fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
                       {s?.ico} {s?.lbl}
                     </button>
@@ -195,7 +195,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
                 {prev ? (
                   <div style={{ position:'relative' }}>
                     <img src={prev} alt={label} style={{ width:'100%', height:160, objectFit:'cover', borderRadius:12, border:'2px solid #22c55e' }} />
-                    <button type="button" onClick={() => { setFile(null); setPrev(null) }}
+                    <button onClick={() => { setFile(null); setPrev(null) }}
                       style={{ position:'absolute', top:8, right:8, background:'rgba(0,0,0,.6)', border:'none', borderRadius:8, color:'#fff', padding:'4px 8px', cursor:'pointer', fontSize:12 }}>
                       Change
                     </button>
@@ -219,7 +219,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
         )}
 
         <div style={{ display:'flex', gap:10 }}>
-          {step>0 && <button type="button" onClick={() => setStep(s=>s-1)} style={{ flex:1, background:'#f0f0f0', border:'none', borderRadius:14, padding:15, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>← Back</button>}
+          {step>0 && <button onClick={() => setStep(s=>s-1)} style={{ flex:1, background:'#f0f0f0', border:'none', borderRadius:14, padding:15, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>← Back</button>}
           <button
             onClick={
               step===0 ? () => { if(!name||!phone||!city){showToast('Fill in all fields');return} setStep(1) }

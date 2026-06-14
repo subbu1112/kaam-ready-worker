@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { Y } from '../theme'
+const Y = '#F5C000'
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY
 
@@ -65,7 +65,7 @@ export default function LoginScreen({ setScreen, showToast }) {
       {/* Tab switcher */}
       <div style={{ display:'flex', margin:'20px 20px 0', background:'#111', borderRadius:12, padding:4, gap:4 }}>
         {[['phone','📱 Phone OTP'],['email','✉️ Email']].map(([t,l]) => (
-          <button key={t} type="button" onClick={() => setTab(t)}
+          <button key={t} onClick={() => setTab(t)}
             style={{ flex:1, padding:'10px 0', borderRadius:9, border:'none', fontWeight:700, fontSize:13,
               background:tab===t?Y:'transparent', color:tab===t?'#000':'#555',
               cursor:'pointer', fontFamily:'inherit' }}>
@@ -86,7 +86,7 @@ export default function LoginScreen({ setScreen, showToast }) {
                 style={{ flex:1, border:'1.5px solid #2a2a2a', borderRadius:12, padding:'13px 14px',
                   fontSize:14, outline:'none', fontFamily:'inherit', background:'#1a1a1a', color:'#fff' }} />
             </div>
-            <button type="button" onClick={sendOTP} disabled={busy}
+            <button onClick={sendOTP} disabled={busy}
               style={{ width:'100%', background:Y, border:'none', borderRadius:14, padding:16, fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'inherit', opacity:busy?0.6:1 }}>
               {busy ? 'Sending...' : 'Send OTP →'}
             </button>
@@ -95,7 +95,7 @@ export default function LoginScreen({ setScreen, showToast }) {
           <div style={{ background:'#111', borderRadius:20, padding:20, border:'1px solid #222' }}>
             <div style={{ display:'flex', marginBottom:16, borderBottom:'1px solid #222' }}>
               {[['Sign In', false],['Sign Up', true]].map(([l,r]) => (
-                <button key={l} type="button" onClick={() => setIsReg(r)}
+                <button key={l} onClick={() => setIsReg(r)}
                   style={{ flex:1, padding:'8px 0', border:'none', borderBottom:'2px solid '+(isReg===r?Y:'transparent'),
                     background:'none', fontWeight:700, fontSize:13, color:isReg===r?Y:'#555', cursor:'pointer', fontFamily:'inherit' }}>
                   {l}
@@ -104,7 +104,7 @@ export default function LoginScreen({ setScreen, showToast }) {
             </div>
             {inp(email, setEmail, 'you@example.com', 'email')}
             {inp(pass, setPass, 'Password (min 6 chars)', 'password')}
-            <button type="button" onClick={emailAuth} disabled={busy}
+            <button onClick={emailAuth} disabled={busy}
               style={{ width:'100%', background:Y, border:'none', borderRadius:14, padding:16, fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'inherit', opacity:busy?0.6:1 }}>
               {busy ? '...' : isReg ? 'Create Account →' : 'Sign In →'}
             </button>

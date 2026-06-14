@@ -7,10 +7,11 @@ export default function TermsModal({ onAccept, dark = false }) {
   const bg   = dark ? '#111' : '#fff'
   const text = dark ? '#fff' : '#000'
   const sub  = dark ? '#555' : '#888'
+  const bdr  = dark ? '#222' : '#f0f0f0'
   const Y    = '#F5C000'
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Terms and Conditions" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.75)', zIndex:9999,
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.75)', zIndex:9999,
       display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
       <div style={{ background:bg, borderRadius:'24px 24px 0 0', width:'100%', maxWidth:430,
         padding:'24px 24px 40px', maxHeight:'80vh', display:'flex', flexDirection:'column' }}>
@@ -34,7 +35,7 @@ export default function TermsModal({ onAccept, dark = false }) {
           <p>We collect your phone number, name, city, and booking history to provide our service. Your data is stored securely on Supabase (ISO 27001 compliant). We do not sell your data to third parties. Location data is only used to match workers to customers.</p>
           <p style={{ marginTop:8 }}>For queries: <span style={{ color:Y }}>support@thekaamready.in</span></p>
         </div>
-        <button type="button" onClick={onAccept}
+        <button onClick={onAccept}
           style={{ width:'100%', background:Y, border:'none', borderRadius:14, padding:16, fontSize:15, fontWeight:800,
             cursor:'pointer', fontFamily:'inherit' }}>
           I Accept — Continue →
