@@ -65,13 +65,7 @@ export default function App() {
 
   async function loadProfile(uid) {
     const { data } = await sb.from('workers')
-      .select(`id,name,phone,city,address,skill,skills,email,alternate_phone,
-               kyc_status,onboarding_done,upi_id,account_status,is_online,
-               rating,total_jobs,trust_score,wallet_balance,avatar_url,
-               aadhar_submitted,aadhar_verified,aadhar_front_url,aadhar_back_url,
-               pan_submitted,pan_verified,pan_front_url,pan_number,aadhaar_number,
-               service_radius_km,working_hours_start,working_hours_end,
-               referral_code,credit_balance,price_min,bank_account,bank_ifsc,bank_name`)
+      .select('id,name,phone,city,address,skill,skills,email,alternate_phone,kyc_status,onboarding_done,upi_id,account_status,is_online,rating,total_jobs,trust_score,wallet_balance,avatar_url,aadhar_submitted,aadhar_verified,aadhar_front_url,aadhar_back_url,pan_submitted,pan_verified,pan_front_url,pan_number,aadhaar_number,service_radius_km,working_hours_start,working_hours_end,referral_code,credit_balance,price_min,bank_account,bank_ifsc,bank_name')
       .eq('id', uid).single()
     if (data) {
       setProfile(data)
@@ -84,4 +78,31 @@ export default function App() {
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(null), 2600) }
 
-  const ctx = {
+  const ctx = { user, profile, setProfile, setScreen, setTab, showToast, reloadProfile: () => user && loadProfile(user.id) }
+
+  return (
+    <Suspense fallback={<PageLoader />}>
+      {screen === 'login'   && <><LoginScreen   {...ctx} />{toast && <Toast msg={toast} />}</>}
+      {screen === 'otp'     && <><OTPScreen     {...ctx} />{toast && <Toast msg={toast} />}</>}
+      {screen === 'onboard' && <><OnboardScreen {...ctx} />{toast && <Toast msg={toast} />}</>}
+      {screen === 'main'    && (
+        <div style={{
+          height:'100vh', display:'flex', flexDirection:'column',
+          background:'#111', maxWidth:430, margin:'0 auto',
+          overflow:'hidden', position:'relative',
+        }}>
+          {showTerms && <TermsModal onAccept={() => { acceptTerms(); setShowTerms(false) }} />}
+          <TabErrorBoundary>
+            {tab === 'home'     && <HomeScreen       {...ctx} />}
+            {tab === 'earnings' && <EarningsScreen   {...ctx} />}
+            {tab === 'history'  && <JobHistoryScreen {...ctx} />}
+            {tab === 'settings' && <SettingsScreen   {...ctx} />}
+            {tab === 'profile'  && <ProfileScreen    {...ctx} />}
+          </TabErrorBoundary>
+          <TabBar tab={tab} setTab={setTab} />
+          {toast && <Toast msg={toast} />}
+        </div>
+      )}
+    </Suspense>
+  )
+}
