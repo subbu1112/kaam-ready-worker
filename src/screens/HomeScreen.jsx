@@ -46,7 +46,7 @@ export default function HomeScreen({ user, profile, showToast }) {
     jobChan.current = sb.channel('job-'+activeJob.id)
       .on('postgres_changes',{event:'UPDATE',schema:'public',table:'bookings',filter:'id=eq.'+activeJob.id},payload=>{
         setActiveJob(prev => prev ? { ...prev, ...payload.new } : prev)
-        if (payload.new.payment_status==='claimed') showToast('Customer says payment sent — please confirm 💸')
+        if (payload.new.payment_status==='pending_verification') showToast('Customer paid via UPI — admin is verifying 💸')
       }).subscribe()
     return () => { if (jobChan.current) sb.removeChannel(jobChan.current) }
   }, [activeJob?.id])
@@ -162,27 +162,7 @@ export default function HomeScreen({ user, profile, showToast }) {
     setShowPrice(false)
     showToast('Price sent — waiting for customer to pay via UPI 💳')
   }
-  async function confirmPayment() {
-    if(!activeJob || busy) return
-    setBusy(true)
-    const amt = activeJob.amount || 0
-    const fee = Math.round(amt * COMMISSION)
-    const { error } = await sb.from('bookings').update({
-      payment_status:'paid', payment_method:'upi', status:'completed',
-      payment_confirmed_at:new Date().toISOString(), completed_at:new Date().toISOString(),
-    }).eq('id', activeJob.id)
-    if (!error) {
-      await sb.from('workers').update({
-        wallet_balance: (profile?.wallet_balance||0) + amt - fee,
-        commission_due: (profile?.commission_due||0) + fee,
-        total_jobs:     (profile?.total_jobs||0) + 1,
-      }).eq('id', user.id)
-      setTodayEarn(e=>e+amt); setTodayJobs(j=>j+1)
-      setActiveJob(null); setPrice(''); setNote('')
-      showToast('₹'+(amt-fee).toLocaleString('en-IN')+' received (₹'+fee+' platform fee) 💰')
-    } else { showToast(error.message) }
-    setBusy(false)
-  }
+  // confirmPayment() removed — only admin can approve payments via the admin dashboard
   function toggleOnline() { const next=!online; setOnline(next); showToast(next?'You are now Online 🟢':'You are now Offline') }
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -272,7 +252,7 @@ export default function HomeScreen({ user, profile, showToast }) {
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
               <p style={{ fontWeight:800, fontSize:14, color:'#fff' }}>🔧 {t('Active Job')}</p>
               <span style={{ background:'#D1FAE5', color:'#065F46', fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:8 }}>
-                {activeJob.payment_status==='claimed' ? t('Payment Sent') : activeJob.status==='priced' ? t('Awaiting Payment') : t('In Progress')}
+                {activeJob.payment_status==='pending_verification' ? t('Payment Under Review') : activeJob.payment_status==='verified' ? t('Payment Verified') : activeJob.status==='priced' ? t('Awaiting Payment') : t('In Progress')}
               </span>
             </div>
             {[['Customer',activeJob.customer_name||'—'],['Service',activeJob.service],['Address',activeJob.address]].map(([k,v]) => (
@@ -321,7 +301,7 @@ export default function HomeScreen({ user, profile, showToast }) {
                 </div>
               </div>
             )}
-            {activeJob.status==='priced' && activeJob.payment_status!=='claimed' && (
+            {activeJob.status==='priced' && !activeJob.payment_status && (
               <div style={{ background:'#1C1C1E', borderRadius:14, padding:16, marginTop:10, textAlign:'center' }}>
                 <div style={{ fontSize:30, marginBottom:8 }}>⏳</div>
                 <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>₹{activeJob.amount} sent to customer</p>
@@ -330,14 +310,25 @@ export default function HomeScreen({ user, profile, showToast }) {
                   style={{ marginTop:12, background:'none', border:'1px solid #2a2a2a', borderRadius:10, color:'#636366', padding:'8px 16px', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>Edit price</button>
               </div>
             )}
-            {activeJob.payment_status==='claimed' && (
+            {(activeJob.payment_status==='pending_verification' || activeJob.payment_status==='verified') && (
               <div style={{ background:'#0d2818', border:'1px solid '+GREEN, borderRadius:14, padding:16, marginTop:10, textAlign:'center' }}>
-                <div style={{ fontSize:30, marginBottom:8 }}>💸</div>
-                <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>Customer paid ₹{activeJob.amount} via UPI</p>
-                <p style={{ color:'#9ca3af', fontSize:12, margin:'4px 0 12px' }}>Check your UPI app, then confirm below</p>
-                <button onClick={confirmPayment} disabled={busy} style={{ width:'100%', background:GREEN, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer', opacity:busy?.6:1 }}>
-                  {busy?'...':t('✓ Confirm Payment Received')}
-                </button>
+                <div style={{ fontSize:30, marginBottom:8 }}>{activeJob.payment_status==='verified'?'✅':'⏳'}</div>
+                <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>
+                  {activeJob.payment_status==='verified'
+                    ? 'Payment verified — job complete!'
+                    : 'Customer marked payment sent'}
+                </p>
+                <p style={{ color:'#9ca3af', fontSize:12, margin:'4px 0 0' }}>
+                  {activeJob.payment_status==='verified'
+                    ? 'Your earnings have been credited to your wallet 💰'
+                    : 'KaamReady admin is verifying the UPI payment...'}
+                </p>
+                {activeJob.payment_status==='verified' && (
+                  <button onClick={() => { setActiveJob(null); setPrice(''); setNote('') }}
+                    style={{ marginTop:12, background:GREEN, color:'#fff', border:'none', borderRadius:12, padding:'12px 24px', fontWeight:800, fontSize:14, cursor:'pointer' }}>
+                    Done ✓
+                  </button>
+                )}
               </div>
             )}
           </div>
