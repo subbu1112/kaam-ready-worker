@@ -4,17 +4,15 @@ import TabBar  from './components/TabBar'
 import Toast   from './components/Toast'
 import TermsModal, { termsAccepted, acceptTerms } from './components/TermsModal'
 
-// ── Lazy-loaded screens (code splitting) ─────────────────────────────────────
-const LoginScreen     = lazy(() => import('./screens/LoginScreen'))
-const OTPScreen       = lazy(() => import('./screens/OTPScreen'))
-const OnboardScreen   = lazy(() => import('./screens/OnboardScreen'))
-const HomeScreen      = lazy(() => import('./screens/HomeScreen'))
-const EarningsScreen  = lazy(() => import('./screens/EarningsScreen'))
-const ProfileScreen   = lazy(() => import('./screens/ProfileScreen'))
+const LoginScreen      = lazy(() => import('./screens/LoginScreen'))
+const OTPScreen        = lazy(() => import('./screens/OTPScreen'))
+const OnboardScreen    = lazy(() => import('./screens/OnboardScreen'))
+const HomeScreen       = lazy(() => import('./screens/HomeScreen'))
+const EarningsScreen   = lazy(() => import('./screens/EarningsScreen'))
+const ProfileScreen    = lazy(() => import('./screens/ProfileScreen'))
 const JobHistoryScreen = lazy(() => import('./screens/JobHistoryScreen'))
-const SettingsScreen  = lazy(() => import('./screens/SettingsScreen'))
+const SettingsScreen   = lazy(() => import('./screens/SettingsScreen'))
 
-// ── Error boundary for tab crashes ───────────────────────────────────────────
 class TabErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
   static getDerivedStateFromError(error) { return { error } }
@@ -23,7 +21,7 @@ class TabErrorBoundary extends Component {
     if (this.state.error) {
       return (
         <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:32 }}>
-          <p style={{ fontSize:32, marginBottom:12 }}>!</p>
+          <p style={{ fontSize:32, marginBottom:12 }}>⚠️</p>
           <p style={{ color:'#fff', fontWeight:800, fontSize:16, marginBottom:8, textAlign:'center' }}>Something went wrong</p>
           <p style={{ color:'#555', fontSize:12, textAlign:'center', marginBottom:20 }}>{this.state.error?.message || 'Unknown error'}</p>
           <button onClick={() => this.setState({ error: null })}
@@ -47,11 +45,11 @@ function PageLoader() {
 }
 
 export default function App() {
-  const [screen,  setScreen]  = useState('login')
-  const [tab,     setTab]     = useState('home')
-  const [user,    setUser]    = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [toast,   setToast]   = useState(null)
+  const [screen,    setScreen]    = useState('login')
+  const [tab,       setTab]       = useState('home')
+  const [user,      setUser]      = useState(null)
+  const [profile,   setProfile]   = useState(null)
+  const [toast,     setToast]     = useState(null)
   const [showTerms, setShowTerms] = useState(false)
 
   useEffect(() => {
@@ -67,7 +65,13 @@ export default function App() {
 
   async function loadProfile(uid) {
     const { data } = await sb.from('workers')
-      .select('id,name,phone,city,kyc_status,onboarding_done,upi_id,account_status')
+      .select(`id,name,phone,city,address,skill,skills,email,alternate_phone,
+               kyc_status,onboarding_done,upi_id,account_status,is_online,
+               rating,total_jobs,trust_score,wallet_balance,avatar_url,
+               aadhar_submitted,aadhar_verified,aadhar_front_url,aadhar_back_url,
+               pan_submitted,pan_verified,pan_front_url,pan_number,aadhaar_number,
+               service_radius_km,working_hours_start,working_hours_end,
+               referral_code,credit_balance,price_min,bank_account,bank_ifsc,bank_name`)
       .eq('id', uid).single()
     if (data) {
       setProfile(data)
@@ -80,8 +84,4 @@ export default function App() {
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(null), 2600) }
 
-  const ctx = { user, profile, setProfile, setScreen, setTab, showToast }
-
-  return (
-    <Suspense fallback={<PageLoader />}>
-      {screen === 'login'  && <><LoginScreen  {...ctx} /
+  const ctx = {

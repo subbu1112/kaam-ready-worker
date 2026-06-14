@@ -13,11 +13,15 @@ const SKILLS = [
 export default function SettingsScreen({ user, profile, onBack, showToast }) {
   const [name,          setName]         = useState(profile?.name || '')
   const [phone,         setPhone]        = useState(profile?.phone || '')
+  const [email,         setEmail]        = useState(profile?.email || '')
+  const [altPhone,      setAltPhone]     = useState(profile?.alternate_phone || '')
   const [city,          setCity]         = useState(profile?.city || '')
   const [address,       setAddress]      = useState(profile?.address || '')
   const [skill,         setSkill]        = useState(profile?.skill || '')
   const [upiId,         setUpiId]        = useState(profile?.upi_id || '')
   const [radius,        setRadius]       = useState(profile?.service_radius_km || 10)
+  const [workStart,     setWorkStart]    = useState(profile?.working_hours_start || '08:00')
+  const [workEnd,       setWorkEnd]      = useState(profile?.working_hours_end || '20:00')
   const [notifJobs,     setNotifJobs]    = useState(true)
   const [notifPayments, setNotifPayments] = useState(true)
   const [notifPromo,    setNotifPromo]   = useState(false)
@@ -31,11 +35,15 @@ export default function SettingsScreen({ user, profile, onBack, showToast }) {
     const { error } = await sb.from('workers').update({
       name: name.trim(),
       phone,
+      email: email.trim() || null,
+      alternate_phone: altPhone.trim() || null,
       city,
       address: address.trim(),
       skill,
       upi_id: upiId.trim(),
       service_radius_km: radius,
+      working_hours_start: workStart,
+      working_hours_end: workEnd,
     }).eq('id', user.id)
     if (error) showToast('Save failed: ' + error.message)
     else showToast('Settings saved ✓')
@@ -83,6 +91,8 @@ export default function SettingsScreen({ user, profile, onBack, showToast }) {
               {[
                 ['Full Name *', 'text', name, v => setName(v)],
                 ['Phone Number', 'tel', phone, v => setPhone(v.replace(/\D/g, '').slice(0, 10))],
+                ['Email Address', 'email', email, v => setEmail(v)],
+                ['Alternate Phone', 'tel', altPhone, v => setAltPhone(v.replace(/\D/g,'').slice(0,10))],
                 ['Home Address', 'text', address, v => setAddress(v)],
                 ['UPI ID *', 'text', upiId, v => setUpiId(v)],
               ].map(([label, type, val, set]) => (
@@ -120,6 +130,23 @@ export default function SettingsScreen({ user, profile, onBack, showToast }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
                   <span style={{ fontSize: 10, color: '#555' }}>2 km</span>
                   <span style={{ fontSize: 10, color: '#555' }}>30 km</span>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#636366', display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: .5 }}>Working Hours</label>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 10, color: '#555', display: 'block', marginBottom: 4 }}>From</label>
+                    <input type="time" value={workStart} onChange={e => setWorkStart(e.target.value)}
+                      style={{ width: '100%', background: '#111', border: '1.5px solid #2a2a2a', borderRadius: 10, padding: '10px', fontSize: 13, outline: 'none', fontFamily: 'inherit', color: '#fff' }} />
+                  </div>
+                  <span style={{ color: '#555', marginTop: 16 }}>—</span>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 10, color: '#555', display: 'block', marginBottom: 4 }}>To</label>
+                    <input type="time" value={workEnd} onChange={e => setWorkEnd(e.target.value)}
+                      style={{ width: '100%', background: '#111', border: '1.5px solid #2a2a2a', borderRadius: 10, padding: '10px', fontSize: 13, outline: 'none', fontFamily: 'inherit', color: '#fff' }} />
+                  </div>
                 </div>
               </div>
 
@@ -166,37 +193,4 @@ export default function SettingsScreen({ user, profile, onBack, showToast }) {
               <p style={{ color: Y, fontWeight: 800, fontSize: 14, marginBottom: 14 }}>Privacy & Security</p>
               {[
                 { ico: '🔒', title: 'Change Password', desc: 'Update your account password', action: () => showToast('A password reset link will be sent to your email') },
-                { ico: '📋', title: 'Download My Data', desc: 'Export all your job and earnings data', action: () => showToast('Data export will be sent to your registered email within 24 hours') },
-                { ico: '👁️', title: 'Profile Visibility', desc: 'Your profile is visible to customers in your city when online', action: () => {} },
-                { ico: '📍', title: 'Location Sharing', desc: 'Shared with customers only during active jobs', action: () => {} },
-              ].map(({ ico, title, desc, action }) => (
-                <div key={title} onClick={action}
-                  style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 0', borderBottom: '1px solid #2a2a2a', cursor: 'pointer' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>{ico}</div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{title}</p>
-                    <p style={{ fontSize: 12, color: '#555', marginTop: 3 }}>{desc}</p>
-                  </div>
-                  <span style={{ color: '#333', fontSize: 16, marginTop: 2 }}>›</span>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ background: '#1a1a1a', borderRadius: 16, padding: 16, border: '1.5px solid #dc2626' }}>
-              <p style={{ color: '#ef4444', fontWeight: 800, fontSize: 14, marginBottom: 8 }}>⚠️ Danger Zone</p>
-              <p style={{ fontSize: 12, color: '#555', marginBottom: 14, lineHeight: 1.6 }}>
-                Deleting your account will permanently remove all your data, job history, and earnings records. This action cannot be reversed.
-              </p>
-              <button onClick={deleteAccount}
-                style={{ width: '100%', background: 'transparent', border: '1.5px solid #dc2626', borderRadius: 12, padding: 13, color: '#ef4444', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>
-                Delete Account
-              </button>
-            </div>
-          </>
-        )}
-
-        <div style={{ height: 16 }} />
-      </div>
-    </div>
-  )
-}
+                { ico: '📋', title: 'Download My Data', desc: 'Export all your job and earnings data', action: () => showToast('Data export will be sent to your registered email within 
