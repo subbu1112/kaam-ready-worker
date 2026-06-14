@@ -1,17 +1,20 @@
-import { useState, useEffect, Component } from 'react'
+import { useState, useEffect, lazy, Suspense, Component } from 'react'
 import { sb } from './lib/supabase'
-import LoginScreen    from './screens/LoginScreen'
-import OTPScreen      from './screens/OTPScreen'
-import OnboardScreen  from './screens/OnboardScreen'
-import HomeScreen     from './screens/HomeScreen'
-import EarningsScreen from './screens/EarningsScreen'
-import ProfileScreen  from './screens/ProfileScreen'
-import JobHistoryScreen from './screens/JobHistoryScreen'
-import SettingsScreen from './screens/SettingsScreen'
-import TabBar         from './components/TabBar'
-import Toast          from './components/Toast'
+import TabBar  from './components/TabBar'
+import Toast   from './components/Toast'
 import TermsModal, { termsAccepted, acceptTerms } from './components/TermsModal'
 
+// ── Lazy-loaded screens (code splitting) ─────────────────────────────────────
+const LoginScreen     = lazy(() => import('./screens/LoginScreen'))
+const OTPScreen       = lazy(() => import('./screens/OTPScreen'))
+const OnboardScreen   = lazy(() => import('./screens/OnboardScreen'))
+const HomeScreen      = lazy(() => import('./screens/HomeScreen'))
+const EarningsScreen  = lazy(() => import('./screens/EarningsScreen'))
+const ProfileScreen   = lazy(() => import('./screens/ProfileScreen'))
+const JobHistoryScreen = lazy(() => import('./screens/JobHistoryScreen'))
+const SettingsScreen  = lazy(() => import('./screens/SettingsScreen'))
+
+// ── Error boundary for tab crashes ───────────────────────────────────────────
 class TabErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
   static getDerivedStateFromError(error) { return { error } }
@@ -34,6 +37,15 @@ class TabErrorBoundary extends Component {
   }
 }
 
+function PageLoader() {
+  return (
+    <div style={{ height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#111' }}>
+      <div style={{ width:36, height:36, border:'3px solid #333', borderTop:'3px solid #F5C000', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
+}
+
 export default function App() {
   const [screen,  setScreen]  = useState('login')
   const [tab,     setTab]     = useState('home')
@@ -54,7 +66,9 @@ export default function App() {
   }, [])
 
   async function loadProfile(uid) {
-    const { data } = await sb.from('workers').select('*').eq('id', uid).single()
+    const { data } = await sb.from('workers')
+      .select('id,name,phone,city,kyc_status,onboarding_done,upi_id,account_status')
+      .eq('id', uid).single()
     if (data) {
       setProfile(data)
       setScreen(data.onboarding_done ? 'main' : 'onboard')
@@ -68,26 +82,6 @@ export default function App() {
 
   const ctx = { user, profile, setProfile, setScreen, setTab, showToast }
 
-  if (screen === 'login')  return <><LoginScreen  {...ctx} />{toast && <Toast msg={toast} />}</>
-  if (screen === 'otp')    return <><OTPScreen    {...ctx} />{toast && <Toast msg={toast} />}</>
-  if (screen === 'onboard') return <><OnboardScreen {...ctx} />{toast && <Toast msg={toast} />}</>
-
   return (
-    <div style={{
-      height: '100vh', display: 'flex', flexDirection: 'column',
-      background: '#111', maxWidth: 430, margin: '0 auto',
-      overflow: 'hidden', position: 'relative',
-    }}>
-      {showTerms && <TermsModal onAccept={() => { acceptTerms(); setShowTerms(false) }} />}
-      <TabErrorBoundary>
-        {tab === 'home'       && <HomeScreen     {...ctx} />}
-        {tab === 'earnings'   && <EarningsScreen {...ctx} />}
-        {tab === 'history'    && <JobHistoryScreen {...ctx} />}
-        {tab === 'settings'   && <SettingsScreen  {...ctx} />}
-        {tab === 'profile'    && <ProfileScreen   {...ctx} />}
-      </TabErrorBoundary>
-      <TabBar tab={tab} setTab={setTab} />
-      {toast && <Toast msg={toast} />}
-    </div>
-  )
-}
+    <Suspense fallback={<PageLoader />}>
+      {screen === 'login'  && <><LoginScreen  {...ctx} /
