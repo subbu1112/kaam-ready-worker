@@ -12,6 +12,11 @@ const EarningsScreen   = lazy(() => import('./screens/EarningsScreen'))
 const ProfileScreen    = lazy(() => import('./screens/ProfileScreen'))
 const JobHistoryScreen = lazy(() => import('./screens/JobHistoryScreen'))
 const SettingsScreen   = lazy(() => import('./screens/SettingsScreen'))
+const HelpScreen       = lazy(() => import('./screens/HelpScreen'))
+const LegalScreen      = lazy(() => import('./screens/LegalScreen'))
+const ReportScreen     = lazy(() => import('./screens/ReportScreen'))
+
+const OVERLAYS = ['help','legal','report']
 
 class TabErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
@@ -46,6 +51,7 @@ function PageLoader() {
 
 export default function App() {
   const [screen,    setScreen]    = useState('login')
+  const [overlay,   setOverlay]   = useState(null)
   const [tab,       setTab]       = useState('home')
   const [user,      setUser]      = useState(null)
   const [profile,   setProfile]   = useState(null)
@@ -78,7 +84,14 @@ export default function App() {
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(null), 2600) }
 
-  const ctx = { user, profile, setProfile, setScreen, setTab, showToast, reloadProfile: () => user && loadProfile(user.id) }
+  function navigate(s) {
+    if (OVERLAYS.includes(s)) { setOverlay(s) }
+    else { setScreen(s) }
+  }
+
+  const ctx = { user, profile, setProfile, setScreen, setTab, showToast, navigate, reloadProfile: () => user && loadProfile(user.id) }
+
+  const overlayStyle = { position:'absolute', inset:0, zIndex:100, background:'#111', display:'flex', flexDirection:'column' }
 
   return (
     <Suspense fallback={<PageLoader />}>
@@ -99,7 +112,10 @@ export default function App() {
             {tab === 'settings' && <SettingsScreen   {...ctx} />}
             {tab === 'profile'  && <ProfileScreen    {...ctx} />}
           </TabErrorBoundary>
-          <TabBar tab={tab} setTab={setTab} />
+          <TabBar tab={tab} setTab={t => { setOverlay(null); setTab(t) }} />
+          {overlay === 'help'   && <div style={overlayStyle}><HelpScreen   {...ctx} onBack={() => setOverlay(null)} /></div>}
+          {overlay === 'legal'  && <div style={overlayStyle}><LegalScreen  {...ctx} onBack={() => setOverlay(null)} /></div>}
+          {overlay === 'report' && <div style={overlayStyle}><ReportScreen {...ctx} onBack={() => setOverlay(null)} /></div>}
           {toast && <Toast msg={toast} />}
         </div>
       )}

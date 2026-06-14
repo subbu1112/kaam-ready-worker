@@ -27,7 +27,7 @@ function Field({ label, value, onChange, type='text', placeholder='' }) {
   )
 }
 
-export default function ProfileScreen({ user, profile, showToast, reloadProfile }) {
+export default function ProfileScreen({ user, profile, showToast, reloadProfile, navigate }) {
   const [modal,      setModal]      = useState(null)
   const [signingOut, setSigningOut] = useState(false)
 
@@ -104,7 +104,9 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile 
     { ico:'📞', label:'Contact Info',   bg:'#0d2d0d', action:() => setModal('contact') },
     { ico:'🛡️', label:'KYC Documents', bg:'#0d0d2d', action:() => setModal('kyc') },
     { ico:'💳', label:'Payment & Bank', bg:'#1a1a1a', action:() => setModal('bank') },
-    { ico:'❓', label:'Help & Support', bg:'#1a1a1a', action:() => showToast('Call us: 1800-XXX-XXXX') },
+    { ico:'❓', label:'Help & Support', bg:'#1a2b2b', action:() => navigate?.('help') },
+    { ico:'🚨', label:'Report an Issue',bg:'#2d1a1a', action:() => navigate?.('report') },
+    { ico:'⚖️', label:'Legal & Privacy',bg:'#1a1a1a', action:() => navigate?.('legal') },
   ]
 
   return (
