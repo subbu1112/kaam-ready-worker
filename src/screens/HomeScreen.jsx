@@ -3,638 +3,354 @@ import { sb } from '../lib/supabase'
 import MapView from '../components/MapView'
 import { floorFor, COMMISSION } from '../constants'
 import { t } from '../i18n'
-
-const Y = '#F5C000', YD = '#C8A000', GREEN = '#25D366', RED = '#EF4444'
-
-/* ─── Rapido-style helpers ─── */
-
-function Plate({ id }) {
-  const num = 'KR#' + String(id || '').slice(-5).padStart(5, '0')
-  return (
-    <div style={{
-      background: Y, border: '1.5px solid ' + YD, borderRadius: 4,
-      padding: '3px 9px', fontFamily: 'monospace', fontSize: 12,
-      fontWeight: 800, color: '#412402', letterSpacing: 0.8, display: 'inline-block'
-    }}>{num}</div>
-  )
-}
-
-function CallBtn({ phone, onMiss }) {
-  const s = {
-    width: 44, height: 44, borderRadius: '50%', background: GREEN,
-    border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center',
-    justifyContent: 'center', flexShrink: 0, textDecoration: 'none',
-    fontSize: 20, boxShadow: '0 2px 8px rgba(37,211,102,.4)'
-  }
-  return phone
-    ? <a href={'tel:+91' + phone} style={s}>📞</a>
-    : <button onClick={onMiss} style={s}>📞</button>
-}
-
-function RouteDots({ from, to }) {
-  return (
-    <div style={{ display: 'flex', gap: 12 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 3, flexShrink: 0 }}>
-        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#00C853' }} />
-        <div style={{ width: 0, height: 28, borderLeft: '1.5px dashed #D0D0D0', margin: '4px 0' }} />
-        <div style={{ width: 10, height: 10, borderRadius: '50%', border: '2.5px solid #FF6B35', background: '#fff' }} />
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: '#212121', margin: '0 0 10px', lineHeight: 1.3 }}>{from}</p>
-        <p style={{ fontSize: 13, fontWeight: 600, color: '#757575', margin: 0, lineHeight: 1.3 }}>{to}</p>
-      </div>
-    </div>
-  )
-}
-
+import { Y, YL, GREEN, RED } from '../theme'
 export default function HomeScreen({ user, profile, showToast }) {
-  const [online,     setOnline]     = useState(() => localStorage.getItem('kr_worker_online') === 'true')
-  const [jobAlert,   setJobAlert]   = useState(null)
-  const [activeJob,  setActiveJob]  = useState(null)
-  const [todayEarn,  setTodayEarn]  = useState(0)
-  const [todayJobs,  setTodayJobs]  = useState(0)
-  const [showPrice,  setShowPrice]  = useState(false)
-  const [price,      setPrice]      = useState('')
-  const [note,       setNote]       = useState('')
-  const [busy,       setBusy]       = useState(false)
-  const [upcoming,   setUpcoming]   = useState([])
-  const [schedAvail, setSchedAvail] = useState([])
-
-  const timer  = useRef(null)
-  const chan    = useRef(null)
-  const jobChan = useRef(null)
-
-  useEffect(() => { if (profile) loadTodayStats() }, [profile])
-
+  const [online,    setOnline]    = useState(() => localStorage.getItem('kr_worker_online') === 'true')
+  const [jobAlert,  setJobAlert]  = useState(null)
+  const [activeJob, setActiveJob] = useState(null)
+  const [todayEarn, setTodayEarn] = useState(0)
+  const [todayJobs, setTodayJobs] = useState(0)
+  const [showPrice, setShowPrice] = useState(false)
+  const [price,     setPrice]     = useState('')
+  const [note,      setNote]      = useState('')
+  const [busy,      setBusy]      = useState(false)
+  const [upcoming,  setUpcoming]  = useState([])   // my accepted scheduled jobs
+  const [schedAvail,setSchedAvail]= useState([])   // scheduled jobs anyone can take
+  const [photoBusy, setPhotoBusy] = useState(null)
+  const timer=useRef(null), chan=useRef(null), jobChan=useRef(null)
+  useEffect(() => { if(profile) loadTodayStats() }, [profile])
+  // Restore an in-progress job after refresh
   useEffect(() => {
     if (!user?.id) return
     sb.from('bookings').select('*').eq('worker_id', user.id)
-      .in('status', ['assigned', 'priced']).order('created_at', { ascending: false }).limit(3)
+      .in('status', ['assigned','priced']).order('created_at', { ascending:false }).limit(3)
       .then(({ data }) => {
-        const j = (data || []).find(b =>
-          !(b.is_scheduled && b.scheduled_at && new Date(b.scheduled_at) > new Date(Date.now() + 15 * 60 * 1000)))
+        const j = (data||[]).find(b => !(b.is_scheduled && b.scheduled_at && new Date(b.scheduled_at) > new Date(Date.now()+15*60*1000)))
         if (j) setActiveJob(prev => prev || j)
       })
   }, [user?.id])
-
   useEffect(() => {
-    if (online) subscribeToJobs()
-    else {
-      if (chan.current) sb.removeChannel(chan.current)
-      clearTimeout(timer.current)
-      setJobAlert(null)
-    }
-    return () => { if (chan.current) sb.removeChannel(chan.current); if (pollRef.current) clearInterval(pollRef.current) }
-  }, [online])
-
+    if(online && profile?.city) subscribeToJobs()
+    else { if(chan.current) sb.removeChannel(chan.current); clearTimeout(timer.current); setJobAlert(null) }
+    return () => { if(chan.current) sb.removeChannel(chan.current); if(pollRef.current) clearInterval(pollRef.current) }
+  }, [online, profile?.city])
   useEffect(() => {
     if (!user?.id) return
     sb.from('workers').update({ is_online: online }).eq('id', user.id).then(() => {})
     localStorage.setItem('kr_worker_online', online)
   }, [online, user?.id])
-
+  // Watch the active job for customer payment claims
   useEffect(() => {
     if (jobChan.current) { sb.removeChannel(jobChan.current); jobChan.current = null }
     if (!activeJob?.id) return
-    jobChan.current = sb.channel('job-' + activeJob.id)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings', filter: 'id=eq.' + activeJob.id }, payload => {
-        const upd = payload.new
-        // Admin confirmed payment — auto-release worker
-        if (upd.status === 'completed' && upd.payment_status === 'paid') {
-          const amt = upd.amount || 0
-          const fee = Math.round(amt * COMMISSION)
-          setTodayEarn(e => e + amt)
-          setTodayJobs(j => j + 1)
-          setActiveJob(null); setPrice(''); setNote(''); setShowPrice(false)
-          showToast('✅ Job complete! Rs.' + (amt - fee).toLocaleString('en-IN') + ' added to your weekly payout')
-          return
-        }
-        setActiveJob(prev => prev ? { ...prev, ...upd } : prev)
-        if (upd.payment_status === 'claimed') showToast('Customer paid — admin is verifying 🔄')
+    jobChan.current = sb.channel('job-'+activeJob.id)
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'bookings',filter:'id=eq.'+activeJob.id},payload=>{
+        setActiveJob(prev => prev ? { ...prev, ...payload.new } : prev)
+        if (payload.new.payment_status==='claimed') showToast('Customer says payment sent — please confirm 💸')
       }).subscribe()
     return () => { if (jobChan.current) sb.removeChannel(jobChan.current) }
   }, [activeJob?.id])
-
   async function loadTodayStats() {
-    if (!user) return
-    const today = new Date().toISOString().slice(0, 10)
-    const { data } = await sb.from('bookings').select('amount')
-      .eq('worker_id', user.id).eq('status', 'completed').gte('created_at', today)
-    if (data) { setTodayJobs(data.length); setTodayEarn(data.reduce((s, b) => s + (b.amount || 0), 0)) }
+    if(!user) return
+    const today=new Date().toISOString().slice(0,10)
+    const { data } = await sb.from('bookings').select('amount').eq('worker_id',user.id).eq('status','completed').gte('created_at',today)
+    if(data) { setTodayJobs(data.length); setTodayEarn(data.reduce((s,b)=>s+(b.amount||0),0)) }
   }
-
-  function kmBetween(lat1, lng1, lat2, lng2) {
-    if (!lat1 || !lng1 || !lat2 || !lng2) return null
-    const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLng = (lng2 - lng1) * Math.PI / 180
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  function kmBetween(lat1,lng1,lat2,lng2) {
+    if (!lat1||!lng1||!lat2||!lng2) return null
+    const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLng=(lng2-lng1)*Math.PI/180
+    const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
   }
-
+  // Nearest workers get the alert first; farther workers see it only if still unclaimed
   function offerJob(b) {
-    // City filter — case-insensitive, graceful when city is null
-    if (b.city && profile?.city && b.city.trim().toLowerCase() !== profile.city.trim().toLowerCase()) return
-    // Skill filter — lenient: labour/general workers see all jobs
-    const openSkills = ['labor', 'emerg']
-    const noSkillFilter = !b.service_id || !profile?.skill || openSkills.includes(profile.skill)
-    if (!noSkillFilter && b.service_id !== profile.skill) return
+    if (b.city !== profile?.city) return
     let delay = 0
-    if (b.preferred_worker_id && b.preferred_worker_id !== user.id) delay = 60000
+    if (b.preferred_worker_id && b.preferred_worker_id !== user.id) delay = 60000  // preferred worker gets 60s head start
     else if (b.preferred_worker_id === user.id) delay = 0
     else {
       const d = kmBetween(profile?.lat, profile?.lng, b.address_lat, b.address_lng)
       if (d !== null) delay = d <= 5 ? 0 : d <= 10 ? 20000 : 45000
     }
     const show = async () => {
-      if (delay > 0) {
+      if (delay > 0) {  // re-check it wasn't taken meanwhile
         const { data } = await sb.from('bookings').select('status').eq('id', b.id).single()
         if (data?.status !== 'searching') return
       }
       setJobAlert(prev => prev || b)
-      showToast(b.preferred_worker_id === user.id ? 'A customer requested YOU! ⭐' : 'New job request! 🔔')
+      showToast(b.preferred_worker_id===user.id ? 'A customer requested YOU! ⭐' : 'New job request! 🔔')
     }
     delay === 0 ? show() : setTimeout(show, delay)
   }
-
-  const pollRef = useRef(null)
-
   function subscribeToJobs() {
-    chan.current = sb.channel('new-jobs-' + profile?.city)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings', filter: 'status=eq.searching' }, payload => offerJob(payload.new))
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings', filter: 'status=eq.searching' }, payload => offerJob(payload.new))
+    chan.current = sb.channel('new-jobs-'+profile?.city)
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'bookings',filter:'status=eq.searching'},payload=>offerJob(payload.new))
       .subscribe()
-    // Initial check + polling fallback every 25s (catches realtime misses)
-    const pollJobs = () => {
-      if (!online || activeJob) return
-      sb.from('bookings').select('*').eq('status', 'searching').eq('city', profile?.city)
-        .gte('created_at', new Date(Date.now() - 4 * 60 * 1000).toISOString())
-        .order('created_at', { ascending: false }).limit(5)
-        .then(({ data }) => (data || []).forEach(b => offerJob(b)))
-    }
-    pollJobs()
-    pollRef.current = setInterval(pollJobs, 25000)
+    // Also pick up jobs that were already waiting before we came online
+    sb.from('bookings').select('*').eq('status','searching').eq('city', profile?.city)
+      .gte('created_at', new Date(Date.now()-3*60*1000).toISOString())
+      .order('created_at',{ascending:false}).limit(1)
+      .then(({ data }) => { if (data?.[0]) offerJob(data[0]) })
     loadScheduled()
   }
-
   async function loadScheduled() {
     const [avail, mine] = await Promise.all([
-      sb.from('bookings').select('*').eq('status', 'scheduled').is('worker_id', null).eq('city', profile?.city)
-        .eq('service_id', profile?.skill)
-        .gte('scheduled_at', new Date().toISOString()).order('scheduled_at').limit(5),
-      sb.from('bookings').select('*').eq('worker_id', user.id).eq('is_scheduled', true).eq('status', 'assigned')
-        .gte('scheduled_at', new Date(Date.now() - 30 * 60 * 1000).toISOString()).order('scheduled_at').limit(5),
+      sb.from('bookings').select('*').eq('status','scheduled').is('worker_id', null).eq('city', profile?.city).gte('scheduled_at', new Date().toISOString()).order('scheduled_at').limit(5),
+      sb.from('bookings').select('*').eq('worker_id', user.id).eq('is_scheduled', true).eq('status','assigned').gte('scheduled_at', new Date(Date.now()-30*60*1000).toISOString()).order('scheduled_at').limit(5),
     ])
     setSchedAvail(avail.data || [])
     setUpcoming(mine.data || [])
   }
-
   async function acceptScheduled(b) {
-    const { error } = await sb.from('bookings').update({
-      worker_id: user.id, status: 'assigned',
-      worker: { id: user.id, name: profile?.name, skill: profile?.skill, rating: profile?.rating, ico: '👷' }
-    }).eq('id', b.id).is('worker_id', null)
+    const { error } = await sb.from('bookings').update({ worker_id: user.id, status:'assigned', worker:{ id:user.id, name:profile?.name, skill:profile?.skill, rating:profile?.rating, ico:'👷' } }).eq('id', b.id).is('worker_id', null)
     if (error) { showToast(error.message); return }
     showToast('Scheduled job is yours ✓ 📅')
     loadScheduled()
   }
-
+  async function uploadJobPhoto(which, file) {
+    if (!activeJob || !file) return
+    setPhotoBusy(which)
+    const path = `${activeJob.id}/${which}.jpg`
+    const { error } = await sb.storage.from('job-photos').upload(path, file, { upsert: true })
+    if (!error) {
+      const { data: pub } = sb.storage.from('job-photos').getPublicUrl(path)
+      const col = which==='before' ? 'photo_before_url' : 'photo_after_url'
+      await sb.from('bookings').update({ [col]: pub.publicUrl }).eq('id', activeJob.id)
+      setActiveJob(prev => ({ ...prev, [col]: pub.publicUrl }))
+      showToast('Photo saved ✓')
+    } else showToast(error.message)
+    setPhotoBusy(null)
+  }
   function getPosition() {
     return new Promise(res => {
       if (!navigator.geolocation) return res(null)
       navigator.geolocation.getCurrentPosition(
         pos => res({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => res(null), { enableHighAccuracy: true, timeout: 5000 })
+        ()  => res(null), { enableHighAccuracy: true, timeout: 5000 })
     })
   }
-
   async function acceptJob() {
-    if (!jobAlert) return
+    if(!jobAlert) return
     const pos = await getPosition()
-    if (pos) sb.from('workers').update({ lat: pos.lat, lng: pos.lng }).eq('id', user.id).then(() => {})
-    const w = { id: user.id, name: profile?.name, skill: profile?.skill, rating: profile?.rating,
-      jobs: profile?.total_jobs, ico: '👷', eta: '8 min', dist: '1.0 km', lat: pos?.lat, lng: pos?.lng }
-    // Guard against race: only update if still searching (not already taken by another worker)
-    const { data: taken } = await sb.from('bookings').update({ status: 'assigned', worker_id: user.id, worker: w })
-      .eq('id', jobAlert.id).eq('status', 'searching').select('id')
-    if (!taken || taken.length === 0) {
-      setJobAlert(null)
-      showToast('Job was already taken — waiting for next one')
-      return
-    }
-    setActiveJob({ ...jobAlert, status: 'assigned', worker: w })
-    setJobAlert(null)
-    showToast('Job accepted! Navigate to customer 🗺️')
+    if (pos) sb.from('workers').update({ lat: pos.lat, lng: pos.lng }).eq('id', user.id).then(()=>{})
+    const w={id:user.id,name:profile?.name,skill:profile?.skill,rating:profile?.rating,jobs:profile?.total_jobs,ico:'👷',eta:'8 min',dist:'1.0 km',lat:pos?.lat,lng:pos?.lng}
+    await sb.from('bookings').update({status:'assigned',worker_id:user.id,worker:w}).eq('id',jobAlert.id)
+    setActiveJob({...jobAlert,status:'assigned',worker:w}); setJobAlert(null); showToast('Job accepted! Navigate to customer 🗺️')
   }
-
   function navigateToCustomer() {
     const j = activeJob
     if (j?.address_lat && j?.address_lng)
-      window.open('https://www.google.com/maps/dir/?api=1&destination=' + j.address_lat + ',' + j.address_lng, '_blank')
+      window.open('https://www.google.com/maps/dir/?api=1&destination='+j.address_lat+','+j.address_lng, '_blank')
     else {
       const q = encodeURIComponent(j?.address || j?.city || 'Karnataka')
-      window.open('https://www.google.com/maps/dir/?api=1&destination=' + q, '_blank')
+      window.open('https://www.google.com/maps/dir/?api=1&destination='+q, '_blank')
     }
   }
-
   function jobFloor(job) { return floorFor(job?.service_id) }
-
   async function submitPrice() {
-    if (!activeJob || busy) return
+    if(!activeJob || busy) return
     const p = parseInt(price, 10)
     const floor = jobFloor(activeJob)
-    if (!p || p < floor) { showToast('Price cannot be below the minimum of Rs.' + floor); return }
+    if (!p || p < floor) { showToast(`Price can't be below the ₹${floor} minimum`); return }
     setBusy(true)
-    const { data: updated, error } = await sb.from('bookings').update({
-      status: 'priced', amount: p, price_note: note.trim() || null, priced_at: new Date().toISOString(),
-    }).eq('id', activeJob.id).eq('worker_id', user.id).eq('status','assigned').select('id')
+    const { error } = await sb.from('bookings').update({
+      status:'priced', amount:p, price_note:note.trim()||null, priced_at:new Date().toISOString(),
+    }).eq('id', activeJob.id)
     setBusy(false)
     if (error) { showToast(error.message); return }
-    if (!updated || updated.length === 0) { showToast('Could not set price — check your connection and try again'); return }
-    setActiveJob(prev => ({ ...prev, status: 'priced', amount: p, price_note: note.trim() || null }))
+    setActiveJob(prev => ({ ...prev, status:'priced', amount:p, price_note:note.trim()||null }))
     setShowPrice(false)
     showToast('Price sent — waiting for customer to pay via UPI 💳')
   }
-
-
-
-  async function cancelJob() {
-    if (!activeJob || busy) return
-    if (!window.confirm('Cancel this job? The customer will be notified.')) return
+  async function confirmPayment() {
+    if(!activeJob || busy) return
     setBusy(true)
-    await sb.from('bookings').update({ status: 'searching', worker_id: null, worker: null }).eq('id', activeJob.id).eq('worker_id', user.id)
+    const amt = activeJob.amount || 0
+    const fee = Math.round(amt * COMMISSION)
+    const { error } = await sb.from('bookings').update({
+      payment_status:'paid', payment_method:'upi', status:'completed',
+      payment_confirmed_at:new Date().toISOString(), completed_at:new Date().toISOString(),
+    }).eq('id', activeJob.id)
+    if (!error) {
+      await sb.from('workers').update({
+        wallet_balance: (profile?.wallet_balance||0) + amt - fee,
+        commission_due: (profile?.commission_due||0) + fee,
+        total_jobs:     (profile?.total_jobs||0) + 1,
+      }).eq('id', user.id)
+      setTodayEarn(e=>e+amt); setTodayJobs(j=>j+1)
+      setActiveJob(null); setPrice(''); setNote('')
+      showToast('₹'+(amt-fee).toLocaleString('en-IN')+' received (₹'+fee+' platform fee) 💰')
+    } else { showToast(error.message) }
     setBusy(false)
-    setActiveJob(null); setPrice(''); setNote(''); setShowPrice(false)
-    showToast('Job cancelled — customer will be re-matched')
   }
-
-  function toggleOnline() {
-    const next = !online
-    setOnline(next)
-    showToast(next ? 'You are now Online 🟢' : 'You are now Offline')
-  }
-
-  const jobStatus = activeJob
-    ? activeJob.payment_status === 'claimed' ? 'payment_claimed'
-      : activeJob.status === 'priced' ? 'awaiting_payment'
-      : 'in_progress'
-    : null
-
-  /* ──────────────────── RENDER ──────────────────── */
+  function toggleOnline() { const next=!online; setOnline(next); showToast(next?'You are now Online 🟢':'You are now Offline') }
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#FAFAFA' }}>
-
-      {/* ── Top bar — white, Rapido-style ── */}
-      <div style={{ padding: '16px 18px 12px', flexShrink: 0, background: '#FFFFFF', borderBottom: '1px solid #F0F0F0' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <p style={{ fontSize: 18, fontWeight: 800, color: '#212121', letterSpacing: -0.3 }}>
-              {profile?.name || 'Worker'} ⚡
-            </p>
-            <p style={{ fontSize: 12, color: '#9E9E9E', marginTop: 1 }}>
-              {profile?.skill} · {profile?.city}
-            </p>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      <div style={{ background:online?GREEN:'#1C1C1E', padding:'10px 20px 6px', display:'flex', justifyContent:'space-between', transition:'background .3s' }}>
+        <span style={{ color:'#fff', fontSize:12, fontWeight:700 }}>Kaam Ready</span>
+        <span style={{ color:'#fff', fontSize:11, fontWeight:800 }}>{online?'● '+t('ONLINE'):'● '+t('OFFLINE')}</span>
+        <span style={{ color:'#fff', fontSize:12 }}>📶 🔋</span>
+      </div>
+      <div style={{ background:'#1C1C1E', padding:'10px 20px 16px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+        <div>
+          <h1 style={{ color:Y, fontSize:20, fontWeight:800 }}>Kaam Ready ⚡</h1>
+          <p style={{ color:'#636366', fontSize:12 }}>{profile?.skill} · {profile?.city}</p>
+        </div>
+        <button type="button" aria-label={online ? 'Go Offline' : 'Go Online'} aria-pressed={online} onClick={toggleOnline} style={{ width:52, height:28, borderRadius:20, background:online?GREEN:'#3A3A3C', position:'relative', cursor:'pointer', transition:'background .2s', border:'none', padding:0 }}>
+          <div style={{ width:22, height:22, background:'#fff', borderRadius:'50%', position:'absolute', top:3, left:online?27:3, transition:'left .2s', boxShadow:'0 1px 4px rgba(0,0,0,.3)' }} />
+        </button>
+      </div>
+      <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:12 }}>
+        {!online && !activeJob && (
+          <div style={{ background:'#111', borderRadius:20, padding:'28px 24px', textAlign:'center', border:'1.5px dashed #2a2a2a' }}>
+            <div style={{ fontSize:44, marginBottom:12 }}>😴</div>
+            <p style={{ fontWeight:800, fontSize:16, color:'#fff' }}>{t('You are Offline')}</p>
+            <p style={{ fontSize:13, color:'#555', margin:'6px 0 18px' }}>Toggle the switch above to start receiving jobs</p>
+            <button type="button" onClick={toggleOnline} style={{ background:Y, border:'none', borderRadius:14, padding:'14px 28px', fontWeight:800, fontSize:14, cursor:'pointer' }}>{t('Go Online Now')}</button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: online ? GREEN : '#9E9E9E' }}>
-              {online ? 'Online' : 'Offline'}
-            </span>
-            <div style={{ position: 'relative' }}>
-              {online && <div className="wr-online-ring" style={{ position:'absolute', inset:-4, borderRadius:'50%', border:'2px solid rgba(37,211,102,.5)', pointerEvents:'none' }} />}
-              <div onClick={toggleOnline} className={online ? 'wr-online-dot' : ''}
-                style={{ width: 52, height: 28, borderRadius: 20, background: online ? GREEN : '#E0E0E0', position: 'relative', cursor: 'pointer', transition: 'background .3s cubic-bezier(.34,1.56,.64,1)', boxShadow: online ? '0 0 16px rgba(37,211,102,.5)' : 'none' }}>
-                <div style={{ width: 22, height: 22, background: '#fff', borderRadius: '50%', position: 'absolute', top: 3, left: online ? 27 : 3, transition: 'left .3s cubic-bezier(.34,1.56,.64,1)', boxShadow: '0 1px 4px rgba(0,0,0,.2)' }} />
+        )}
+        {online && !jobAlert && !activeJob && (
+          <div style={{ background:'#111', border:'1.5px solid '+Y, borderRadius:20, padding:'28px 24px', textAlign:'center' }}>
+            <div style={{ fontSize:44, marginBottom:12, animation:'float 1.5s ease-in-out infinite' }}>🟢</div>
+            <p style={{ fontWeight:800, fontSize:16, color:'#fff' }}>{t('Waiting for jobs...')}</p>
+            <p style={{ fontSize:13, color:'#636366', marginTop:6 }}>You'll be notified instantly when a job matches</p>
+          </div>
+        )}
+        {online && upcoming.length>0 && (
+          <div style={{ background:'#111', border:'1.5px solid #5B21B6', borderRadius:20, padding:16 }}>
+            <p style={{ color:'#a78bfa', fontWeight:800, fontSize:14, marginBottom:10 }}>📅 {t('Upcoming Jobs')}</p>
+            {upcoming.map(b => (
+              <div key={b.id} style={{ borderTop:'1px solid #1a1a1a', padding:'10px 0' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div>
+                    <p style={{ color:'#fff', fontSize:13, fontWeight:700 }}>{b.service} · {b.customer_name||''}</p>
+                    <p style={{ color:'#636366', fontSize:11, marginTop:2 }}>{new Date(b.scheduled_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})} · {b.address}</p>
+                  </div>
+                  <button type="button" onClick={() => setActiveJob(b)}
+                    style={{ background:Y, border:'none', borderRadius:10, padding:'8px 14px', fontWeight:800, fontSize:12, cursor:'pointer', flexShrink:0 }}>{t('Start Job')}</button>
+                </div>
               </div>
+            ))}
+          </div>
+        )}
+        {online && !activeJob && schedAvail.length>0 && (
+          <div style={{ background:'#111', border:'1.5px dashed #5B21B6', borderRadius:20, padding:16 }}>
+            <p style={{ color:'#a78bfa', fontWeight:800, fontSize:14, marginBottom:10 }}>📅 {t('Scheduled Jobs Available')}</p>
+            {schedAvail.map(b => (
+              <div key={b.id} style={{ borderTop:'1px solid #1a1a1a', padding:'10px 0', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <div>
+                  <p style={{ color:'#fff', fontSize:13, fontWeight:700 }}>{b.service}</p>
+                  <p style={{ color:'#636366', fontSize:11, marginTop:2 }}>{new Date(b.scheduled_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</p>
+                </div>
+                <button type="button" onClick={() => acceptScheduled(b)}
+                  style={{ background:'#22c55e', color:'#fff', border:'none', borderRadius:10, padding:'8px 14px', fontWeight:800, fontSize:12, cursor:'pointer', flexShrink:0 }}>✓ {t('Accept')}</button>
+              </div>
+            ))}
+          </div>
+        )}
+        {jobAlert && (
+          <div style={{ background:'#1C1C1E', borderRadius:20, padding:16, border:'2px solid '+Y, animation:'popIn .3s ease' }}>
+            <h3 style={{ color:Y, fontWeight:800, fontSize:15, marginBottom:12 }}>🔔 {t('New Job Request!')}</h3>
+            {[['Service',jobAlert.service],['Address',jobAlert.address],['City',jobAlert.city]].map(([k,v]) => (
+              <div key={k} style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+                <span style={{ color:'#636366', fontSize:12 }}>{k}</span>
+                <span style={{ color:'#fff', fontSize:13, fontWeight:600, maxWidth:'60%', textAlign:'right' }}>{v}</span>
+              </div>
+            ))}
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}>
+              <span style={{ color:'#636366', fontSize:12 }}>{t('Starting price')}</span>
+              <span style={{ color:Y, fontSize:18, fontWeight:800 }}>from ₹{jobFloor(jobAlert)}</span>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button type="button" onClick={acceptJob} style={{ flex:1, background:GREEN, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer' }}>✓ {t('Accept')}</button>
+              <button type="button" onClick={() => setJobAlert(null)} style={{ flex:1, background:RED, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer' }}>✕ {t('Decline')}</button>
             </div>
           </div>
-        </div>
-
-        {/* Stats row */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          {[
-            { label: 'Earnings', value: 'Rs.' + todayEarn.toLocaleString('en-IN'), accent: true },
-            { label: 'Jobs', value: String(todayJobs) },
-            { label: 'Rating', value: '★ ' + (profile?.rating || 5.0) },
-          ].map(s => (
-            <div key={s.label} style={{ flex: 1, borderRadius: 10, padding: '8px 6px', textAlign: 'center', background: s.accent ? '#FFF8CC' : '#F5F5F5', border: '1px solid ' + (s.accent ? Y : '#EEEEEE') }}>
-              <p style={{ fontSize: 15, fontWeight: 800, color: s.accent ? '#412402' : '#212121' }}>{s.value}</p>
-              <p style={{ fontSize: 10, color: '#9E9E9E', marginTop: 2, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.3 }}>{s.label}</p>
+        )}
+        {activeJob && (
+          <div style={{ background:'#111', borderRadius:20, padding:16, border:'2px solid '+GREEN }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+              <p style={{ fontWeight:800, fontSize:14, color:'#fff' }}>🔧 {t('Active Job')}</p>
+              <span style={{ background:'#D1FAE5', color:'#065F46', fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:8 }}>
+                {activeJob.payment_status==='claimed' ? t('Payment Sent') : activeJob.status==='priced' ? t('Awaiting Payment') : t('In Progress')}
+              </span>
+            </div>
+            {[['Customer',activeJob.customer_name||'—'],['Service',activeJob.service],['Address',activeJob.address]].map(([k,v]) => (
+              <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #1a1a1a' }}>
+                <span style={{ fontSize:13, color:'#636366' }}>{k}</span>
+                <span style={{ fontSize:13, fontWeight:600, color:'#fff', maxWidth:'60%', textAlign:'right' }}>{v}</span>
+              </div>
+            ))}
+            {activeJob.status!=='priced' && !activeJob.payment_status && <>
+              <MapView
+                customerLat={activeJob.address_lat} customerLng={activeJob.address_lng}
+                workerLat={activeJob.worker?.lat || profile?.lat} workerLng={activeJob.worker?.lng || profile?.lng}
+                style={{ borderRadius:12, height:160, overflow:'hidden', marginTop:10 }} />
+              <div style={{ display:'flex', gap:8, marginTop:10 }}>
+                <button type="button" onClick={navigateToCustomer} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>🗺️ {t('Directions')}</button>
+                {activeJob.customer_phone
+                  ? <a href={'tel:+91'+activeJob.customer_phone} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer', textAlign:'center', textDecoration:'none', color:'#000' }}>📞 {t('Call Customer')}</a>
+                  : <button type="button" onClick={() => showToast('Customer phone not available for this booking')} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>📞 Call</button>}
+              </div>
+            </>}
+            {activeJob.status!=='priced' && !activeJob.payment_status && (
+              <div style={{ display:'flex', gap:8, marginTop:10 }}>
+                {[['before', activeJob.photo_before_url],['after', activeJob.photo_after_url]].map(([which, url]) => (
+                  <label key={which} style={{ flex:1, background: url ? '#0d2818' : '#1C1C1E', border:'1px solid '+(url?GREEN:'#2a2a2a'), borderRadius:12, padding:10, textAlign:'center', cursor:'pointer', fontSize:12, fontWeight:700, color: url ? '#4ade80' : '#888' }}>
+                    {photoBusy===which ? '...' : (url ? '✓ ' : '📷 ')+t(which==='before'?'Before':'After')}
+                    <input type="file" accept="image/*" capture="environment" style={{ display:'none' }}
+                      onChange={e => uploadJobPhoto(which, e.target.files[0])} />
+                  </label>
+                ))}
+              </div>
+            )}
+            {activeJob.status!=='priced' && !showPrice && (
+              <button type="button" onClick={() => { setPrice(''); setNote(''); setShowPrice(true) }} style={{ width:'100%', background:GREEN, color:'#fff', border:'none', borderRadius:14, padding:15, fontWeight:800, fontSize:14, cursor:'pointer', marginTop:10 }}>{t('Work Done — Set Final Price ₹')}</button>
+            )}
+            {activeJob.status!=='priced' && showPrice && (
+              <div style={{ background:'#1C1C1E', borderRadius:14, padding:14, marginTop:10 }}>
+                <p style={{ color:Y, fontWeight:800, fontSize:13, marginBottom:4 }}>Final Price</p>
+                <p style={{ color:'#636366', fontSize:11, marginBottom:10 }}>Minimum: ₹{jobFloor(activeJob)} — price the job fairly, the customer approves it before paying</p>
+                <input value={price} onChange={e => setPrice(e.target.value.replace(/\D/g,'').slice(0,5))} type="tel" placeholder="₹ amount"
+                  style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:12, fontSize:15, fontWeight:700, color:'#fff', outline:'none', fontFamily:'inherit', marginBottom:8 }} />
+                <input value={note} onChange={e => setNote(e.target.value.slice(0,120))} placeholder="Why this price? e.g. extra wiring replaced"
+                  style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:12, fontSize:13, color:'#fff', outline:'none', fontFamily:'inherit', marginBottom:10 }} />
+                <div style={{ display:'flex', gap:8 }}>
+                  <button type="button" onClick={() => setShowPrice(false)} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:10, padding:12, fontWeight:700, fontSize:13, cursor:'pointer' }}>Cancel</button>
+                  <button type="button" onClick={submitPrice} disabled={busy} style={{ flex:2, background:Y, border:'none', borderRadius:10, padding:12, fontWeight:800, fontSize:13, cursor:'pointer', opacity:busy?.6:1 }}>{busy?'...':t('Send to Customer →')}</button>
+                </div>
+              </div>
+            )}
+            {activeJob.status==='priced' && activeJob.payment_status!=='claimed' && (
+              <div style={{ background:'#1C1C1E', borderRadius:14, padding:16, marginTop:10, textAlign:'center' }}>
+                <div style={{ fontSize:30, marginBottom:8 }}>⏳</div>
+                <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>₹{activeJob.amount} sent to customer</p>
+                <p style={{ color:'#636366', fontSize:12, marginTop:4 }}>Waiting for them to pay via UPI...</p>
+                <button type="button" onClick={() => { setPrice(String(activeJob.amount||'')); setNote(activeJob.price_note||''); setActiveJob(p=>({...p,status:'assigned'})); setShowPrice(true) }}
+                  style={{ marginTop:12, background:'none', border:'1px solid #2a2a2a', borderRadius:10, color:'#636366', padding:'8px 16px', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>Edit price</button>
+              </div>
+            )}
+            {activeJob.payment_status==='claimed' && (
+              <div style={{ background:'#0d2818', border:'1px solid '+GREEN, borderRadius:14, padding:16, marginTop:10, textAlign:'center' }}>
+                <div style={{ fontSize:30, marginBottom:8 }}>💸</div>
+                <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>Customer paid ₹{activeJob.amount} via UPI</p>
+                <p style={{ color:'#9ca3af', fontSize:12, margin:'4px 0 12px' }}>Check your UPI app, then confirm below</p>
+                <button type="button" onClick={confirmPayment} disabled={busy} style={{ width:'100%', background:GREEN, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer', opacity:busy?.6:1 }}>
+                  {busy?'...':t('✓ Confirm Payment Received')}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
+          {[['₹'+todayEarn.toLocaleString('en-IN'),t('Today')],[todayJobs,t('Jobs done')],[(profile?.rating||5.0)+'⭐',t('Rating')]].map(([v,l]) => (
+            <div key={l} style={{ background:YL, borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
+              <div style={{ fontSize:17, fontWeight:800 }}>{v}</div>
+              <div style={{ fontSize:10, color:'#888', marginTop:2 }}>{l}</div>
             </div>
           ))}
         </div>
       </div>
-
-      {/* ── Scroll body ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 12, WebkitOverflowScrolling: 'touch' }}>
-
-        {/* ── Offline state ── */}
-        {!online && !activeJob && (
-          <div className="wr-card-float" style={{ background: '#FFFFFF', borderRadius: 20, padding: '36px 24px', textAlign: 'center', border: '1.5px dashed #E0E0E0', boxShadow: '0 2px 8px rgba(0,0,0,.04)' }}>
-            <div style={{ fontSize: 52, marginBottom: 12 }}>😴</div>
-            <p style={{ fontWeight: 800, fontSize: 17, color: '#212121' }}>{t('You are Offline')}</p>
-            <p style={{ fontSize: 13, color: '#9E9E9E', margin: '8px 0 20px' }}>Toggle the switch above to start receiving jobs</p>
-            <button onClick={toggleOnline} className="wr-btn-anim"
-              style={{ background: Y, border: 'none', borderRadius: 14, padding: '14px 32px', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'Inter, sans-serif', color: '#412402', boxShadow: '0 4px 14px rgba(245,192,0,.35)' }}>
-              {t('Go Online Now')}
-            </button>
-          </div>
-        )}
-
-        {/* ── Waiting state ── */}
-        {online && !jobAlert && !activeJob && (
-          <div className="wr-card-float" style={{ background: '#FFFFFF', borderRadius: 20, padding: '36px 24px', textAlign: 'center', border: '1.5px solid #E8F5E9', boxShadow: '0 2px 8px rgba(0,0,0,.04)' }}>
-            <div style={{ fontSize: 52, marginBottom: 12 }}>🟢</div>
-            <p style={{ fontWeight: 800, fontSize: 17, color: '#212121' }}>{t('Waiting for jobs…')}</p>
-            <p style={{ fontSize: 13, color: '#9E9E9E', marginTop: 6 }}>You will be notified instantly when a job matches</p>
-          </div>
-        )}
-
-        {/* ── My upcoming scheduled jobs ── */}
-        {online && upcoming.length > 0 && (
-          <div style={{ background: '#FFFFFF', borderRadius: 18, overflow: 'hidden', border: '1.5px solid #EDE9FF', boxShadow: '0 2px 8px rgba(0,0,0,.04)' }}>
-            <div style={{ padding: '13px 16px', borderBottom: '1px solid #F5F5F5', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 16 }}>📅</span>
-              <p style={{ color: '#7C3AED', fontWeight: 800, fontSize: 14 }}>{t('My Upcoming Jobs')}</p>
-            </div>
-            {upcoming.map(b => (
-              <div key={b.id} style={{ padding: '13px 16px', borderBottom: '1px solid #F5F5F5', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ color: '#212121', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {b.service} · {b.customer_name || ''}
-                  </p>
-                  <p style={{ color: '#9E9E9E', fontSize: 11, marginTop: 2 }}>
-                    {new Date(b.scheduled_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · {b.address}
-                  </p>
-                </div>
-                <button onClick={() => setActiveJob(b)}
-                  style={{ background: Y, border: 'none', borderRadius: 10, padding: '8px 14px', fontWeight: 800, fontSize: 12, cursor: 'pointer', fontFamily: 'Inter, sans-serif', flexShrink: 0, color: '#412402' }}>
-                  {t('Start Job')}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ── Available scheduled jobs ── */}
-        {online && !activeJob && schedAvail.length > 0 && (
-          <div style={{ background: '#FFFFFF', borderRadius: 18, overflow: 'hidden', border: '1.5px dashed #DDD6FE', boxShadow: '0 2px 8px rgba(0,0,0,.04)' }}>
-            <div style={{ padding: '13px 16px', borderBottom: '1px solid #F5F5F5', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 16 }}>📅</span>
-              <p style={{ color: '#7C3AED', fontWeight: 800, fontSize: 14 }}>{t('Scheduled Jobs Available')}</p>
-            </div>
-            {schedAvail.map(b => (
-              <div key={b.id} style={{ padding: '13px 16px', borderBottom: '1px solid #F5F5F5', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ color: '#212121', fontSize: 13, fontWeight: 700 }}>{b.service}</p>
-                  <p style={{ color: '#9E9E9E', fontSize: 11, marginTop: 2 }}>
-                    {new Date(b.scheduled_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
-                <button onClick={() => acceptScheduled(b)}
-                  style={{ background: '#E8F5E9', color: '#1B5E20', border: '1px solid #A5D6A7', borderRadius: 10, padding: '8px 14px', fontWeight: 800, fontSize: 12, cursor: 'pointer', fontFamily: 'Inter, sans-serif', flexShrink: 0 }}>
-                  ✓ {t('Accept')}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ── New job alert — Rapido style ── */}
-        {jobAlert && (
-          <div className="wr-job-card-enter wr-job-card-glow" style={{ background: '#FFFFFF', borderRadius: 22, overflow: 'hidden', border: '2px solid ' + Y, boxShadow: '0 4px 20px rgba(245,192,0,.25)' }}>
-
-            {/* Service + plate + starting price */}
-            <div style={{ padding: '14px 18px 0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 10, background: '#FFF8CC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🔧</div>
-                  <div>
-                    <p style={{ fontSize: 13, color: '#9E9E9E', margin: '0 0 4px', lineHeight: 1.2 }}>{jobAlert.service}</p>
-                    <Plate id={jobAlert.id} />
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: 11, color: '#9E9E9E', margin: 0 }}>Starting from</p>
-                  <p style={{ fontSize: 22, fontWeight: 900, color: '#212121', margin: 0, lineHeight: 1.1 }}>Rs.{jobFloor(jobAlert)}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Yellow separator */}
-            <div style={{ height: 2, background: Y, margin: '12px 0 0' }} />
-
-            {/* Customer */}
-            <div style={{ padding: '12px 18px 0' }}>
-              <p style={{ fontSize: 11, color: '#9E9E9E', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, margin: '0 0 10px' }}>Customer</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#EEEEEE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#757575', flexShrink: 0 }}>
-                  {(jobAlert.customer_name || 'C')[0].toUpperCase()}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: '#212121', margin: 0, lineHeight: 1.2 }}>
-                    {jobAlert.customer_name || 'Customer'}{jobAlert.preferred_worker_id === user?.id && ' ⭐'}
-                  </p>
-                  <p style={{ fontSize: 12, color: '#9E9E9E', margin: 0 }}>Kaam Ready Customer</p>
-                </div>
-                <CallBtn phone={null} onMiss={() => showToast('Accept the job first to call')} />
-              </div>
-            </div>
-
-            <div style={{ height: 1, background: '#F5F5F5', margin: '12px 0' }} />
-
-            {/* Journey details */}
-            <div style={{ padding: '0 18px' }}>
-              <p style={{ fontSize: 13, fontWeight: 700, color: '#212121', margin: '0 0 10px' }}>Job details</p>
-              <RouteDots from={jobAlert.address || jobAlert.city} to={'On-site work · ' + (jobAlert.city || 'Mysuru')} />
-            </div>
-
-            <div style={{ height: 1, background: '#F5F5F5', margin: '12px 0' }} />
-
-            {/* Payment row */}
-            <div style={{ padding: '0 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 34, height: 34, borderRadius: '50%', background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16 }}>💵</div>
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#212121', flex: 1 }}>Cash / UPI</span>
-              <span style={{ fontSize: 15, fontWeight: 700, color: '#212121' }}>Rs.{jobFloor(jobAlert)}+</span>
-            </div>
-
-          </div>
-        )}
-
-        {/* ── Active Job — Rapido style ── */}
-        {activeJob && (
-          <div className="wr-screen-slide" style={{ background: '#FFFFFF', borderRadius: 22, overflow: 'hidden', border: '1.5px solid #E8F5E9', boxShadow: '0 4px 16px rgba(0,0,0,.06)' }}>
-
-            {/* Service + plate + status */}
-            <div style={{ padding: '14px 18px 0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 10, background: '#FFF8CC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🔧</div>
-                  <div>
-                    <p style={{ fontSize: 13, color: '#9E9E9E', margin: '0 0 4px', lineHeight: 1.2 }}>{activeJob.service}</p>
-                    <Plate id={activeJob.id} />
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: 11, color: '#9E9E9E', margin: 0 }}>Status</p>
-                  <p style={{ fontSize: 13, fontWeight: 800, margin: 0, lineHeight: 1.1, color: jobStatus === 'payment_claimed' ? GREEN : jobStatus === 'awaiting_payment' ? '#F59E0B' : '#212121' }}>
-                    {jobStatus === 'payment_claimed' ? '🔄 Verifying' : jobStatus === 'awaiting_payment' ? '⏳ Awaiting' : '⚡ Active'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Yellow separator */}
-            <div style={{ height: 2, background: Y, margin: '12px 0 0' }} />
-
-            {/* Customer */}
-            <div style={{ padding: '12px 18px 0' }}>
-              <p style={{ fontSize: 11, color: '#9E9E9E', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, margin: '0 0 10px' }}>Customer</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#EEEEEE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#757575', flexShrink: 0 }}>
-                  {(activeJob.customer_name || 'C')[0].toUpperCase()}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: '#212121', margin: 0, lineHeight: 1.2 }}>{activeJob.customer_name || 'Customer'}</p>
-                  <p style={{ fontSize: 12, color: '#9E9E9E', margin: 0 }}>Kaam Ready Customer</p>
-                </div>
-                <CallBtn phone={activeJob.customer_phone} onMiss={() => showToast('Customer phone not available')} />
-              </div>
-            </div>
-
-            <div style={{ height: 1, background: '#F5F5F5', margin: '12px 0' }} />
-
-            {/* Journey details */}
-            <div style={{ padding: '0 18px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <p style={{ fontSize: 13, fontWeight: 700, color: '#212121', margin: 0 }}>Journey details</p>
-                <button onClick={navigateToCustomer}
-                  style={{ background: Y, border: 'none', borderRadius: 8, padding: '5px 12px', fontWeight: 700, fontSize: 11, color: '#412402', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
-                  Navigate
-                </button>
-              </div>
-              <RouteDots from={activeJob.address || activeJob.city} to={'On-site work · ' + (activeJob.city || 'Mysuru')} />
-            </div>
-
-            {/* Map (in_progress only) */}
-            {jobStatus === 'in_progress' && (
-              <>
-                <div style={{ margin: '12px 18px 0' }}>
-                  <MapView
-                    customerLat={activeJob.address_lat}
-                    customerLng={activeJob.address_lng}
-                    workerLat={activeJob.worker?.lat || profile?.lat}
-                    workerLng={activeJob.worker?.lng || profile?.lng}
-                    height={160}
-                  />
-                </div>
-
-              </>
-            )}
-
-            {/* Payment row */}
-            <div style={{ height: 1, background: '#F5F5F5', margin: '12px 0' }} />
-            <div style={{ padding: '0 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 34, height: 34, borderRadius: '50%', background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16 }}>💵</div>
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#212121', flex: 1 }}>UPI · Platform collect</span>
-              {activeJob.amount && <span style={{ fontSize: 15, fontWeight: 700, color: '#212121' }}>Rs.{activeJob.amount}</span>}
-            </div>
-
-          </div>
-        )}
-      </div>
-
-      {/* ── Sticky action bar — always visible above TabBar ── */}
-      {jobAlert && !activeJob && (
-        <div style={{ flexShrink: 0, background: '#FFFFFF', borderTop: '2px solid ' + Y, padding: '12px 16px 14px' }}>
-          <button onClick={acceptJob} className="wr-accept-btn wr-btn-anim"
-            style={{ width: '100%', background: Y, border: 'none', borderRadius: 14, padding: 18,
-              fontWeight: 900, fontSize: 16, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
-              color: '#412402', marginBottom: 8 }}>
-            ✓ Accept Job
-          </button>
-          <button onClick={() => setJobAlert(null)}
-            style={{ width: '100%', background: 'none', border: '1.5px solid #F5F5F5', borderRadius: 14,
-              padding: '13px 16px', fontWeight: 700, fontSize: 14, cursor: 'pointer',
-              fontFamily: 'Inter, sans-serif', color: RED }}>
-            Decline
-          </button>
-        </div>
-      )}
-
-      {/* ── Sticky action bar — always visible above TabBar ── */}
-      {activeJob && jobStatus && (
-        <div style={{ flexShrink: 0, background: '#FFFFFF', borderTop: '1px solid #F0F0F0', padding: '10px 16px 12px' }}>
-
-          {/* Work Done button */}
-          {jobStatus === 'in_progress' && !showPrice && (
-            <div>
-              <button onClick={() => { setPrice(''); setNote(''); setShowPrice(true) }} className="wr-btn-anim"
-                style={{ width: '100%', background: Y, border: 'none', borderRadius: 12, padding: 16, fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'Inter, sans-serif', color: '#412402', boxShadow: '0 4px 12px rgba(245,192,0,.35)' }}>
-                {t('Work Done — Set Final Price ₹')}
-              </button>
-              <p onClick={cancelJob}
-                style={{ textAlign: 'center', fontSize: 13, color: RED, padding: '8px 0 0', cursor: 'pointer', margin: 0, fontWeight: 600 }}>
-                Cancel job
-              </p>
-            </div>
-          )}
-
-          {/* Price input panel */}
-          {jobStatus === 'in_progress' && showPrice && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <p style={{ color: '#412402', fontWeight: 800, fontSize: 14, margin: 0 }}>
-                  Set Final Price — min Rs.{jobFloor(activeJob)}
-                </p>
-                <button onClick={() => setShowPrice(false)}
-                  style={{ background: 'none', border: 'none', color: '#9E9E9E', fontSize: 13, cursor: 'pointer', fontWeight: 700 }}>✕ Cancel</button>
-              </div>
-              <input value={price}
-                onChange={e => setPrice(e.target.value.replace(/\D/g, '').slice(0, 5))}
-                type="tel" placeholder="Rs. amount" autoFocus
-                style={{ width: '100%', background: '#fff', border: '2px solid ' + Y, borderRadius: 10, padding: '13px 14px', fontSize: 22, fontWeight: 800, color: '#412402', outline: 'none', fontFamily: 'Inter, sans-serif', marginBottom: 8, boxSizing: 'border-box' }} />
-              <input value={note} onChange={e => setNote(e.target.value.slice(0, 120))}
-                placeholder="Optional: reason e.g. extra parts replaced"
-                style={{ width: '100%', background: '#fff', border: '1.5px solid #E0E0E0', borderRadius: 10, padding: '11px 14px', fontSize: 13, color: '#757575', outline: 'none', fontFamily: 'Inter, sans-serif', marginBottom: 10, boxSizing: 'border-box' }} />
-              <button onClick={submitPrice} disabled={busy}
-                style={{ width: '100%', background: busy ? '#E0E0E0' : Y, border: 'none', borderRadius: 10, padding: 14, fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'Inter, sans-serif', color: busy ? '#9E9E9E' : '#412402', opacity: busy ? 0.7 : 1 }}>
-                {busy ? '…' : t('Send to Customer →')}
-              </button>
-            </div>
-          )}
-
-          {/* Awaiting payment */}
-          {jobStatus === 'awaiting_payment' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ flex: 1 }}>
-                <p style={{ color: '#212121', fontWeight: 800, fontSize: 14, margin: 0 }}>⏳ Rs.{activeJob.amount} — waiting for customer</p>
-                <p style={{ color: '#9E9E9E', fontSize: 12, margin: '2px 0 0' }}>Customer is reviewing price and paying via UPI</p>
-              </div>
-              <button onClick={() => {
-                setPrice(String(activeJob.amount || ''))
-                setNote(activeJob.price_note || '')
-                setActiveJob(p => ({ ...p, status: 'assigned' }))
-                setShowPrice(true)
-              }} style={{ background: '#F5F5F5', border: '1px solid #E0E0E0', borderRadius: 10, color: '#9E9E9E', padding: '10px 14px', fontSize: 12, cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontWeight: 700, flexShrink: 0 }}>
-                Edit
-              </button>
-            </div>
-          )}
-
-          {/* Admin verifying payment — worker just waits */}
-          {jobStatus === 'payment_claimed' && (
-            <div style={{ background: '#E8F5E9', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ fontSize: 28, flexShrink: 0 }}>🔄</div>
-              <div>
-                <p style={{ color: '#1B5E20', fontWeight: 800, fontSize: 14, margin: 0 }}>
-                  Customer paid Rs.{activeJob.amount}
-                </p>
-                <p style={{ color: '#2E7D32', fontSize: 12, margin: '2px 0 0' }}>
-                  Admin is verifying — your wallet will be credited after confirmation
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }

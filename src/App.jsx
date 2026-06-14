@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { sb } from './lib/supabase'
 import OneSignal from 'react-onesignal'
-import LandingScreen  from './screens/LandingScreen'
 import LoginScreen    from './screens/LoginScreen'
 import OTPScreen      from './screens/OTPScreen'
 import OnboardScreen  from './screens/OnboardScreen'
@@ -13,7 +12,7 @@ import Toast          from './components/Toast'
 import TermsModal, { termsAccepted, acceptTerms } from './components/TermsModal'
 
 export default function App() {
-  const [screen,  setScreen]  = useState('landing')
+  const [screen,  setScreen]  = useState('login')
   const [tab,     setTab]     = useState('home')
   const [user,    setUser]    = useState(null)
   const [profile, setProfile] = useState(null)
@@ -21,13 +20,11 @@ export default function App() {
   const [showTerms, setShowTerms] = useState(false)
 
   useEffect(() => {
-    sb.auth.getSession().then(({ data }) => {
-      if (data.session?.user) { setUser(data.session.user); loadProfile(data.session.user.id) }
-    })
-    sb.auth.onAuthStateChange((_e, session) => {
+    const { data: { subscription } } = sb.auth.onAuthStateChange((_e, session) => {
       if (session?.user) { setUser(session.user); loadProfile(session.user.id) }
-      else { setUser(null); setProfile(null); setScreen(prev => prev === 'landing' ? 'landing' : 'login') }
+      else { setUser(null); setProfile(null); setScreen('login') }
     })
+    return () => subscription.unsubscribe()
   }, [])
 
   async function loadProfile(uid) {
@@ -48,13 +45,12 @@ export default function App() {
 
   const ctx = { user, profile, setProfile, showToast, setScreen, setTab, loadProfile }
 
-  if (screen==='landing') return <LandingScreen setScreen={setScreen} />
   if (screen==='login')   return <><LoginScreen   {...ctx} />{toast && <Toast msg={toast} />}</>
   if (screen==='otp')     return <><OTPScreen     {...ctx} />{toast && <Toast msg={toast} />}</>
   if (screen==='onboard') return <><OnboardScreen {...ctx} />{toast && <Toast msg={toast} />}</>
 
   return (
-    <div style={{ height:'100dvh', minHeight:'-webkit-fill-available', display:'flex', flexDirection:'column', background:'#FAFAFA', maxWidth:430, margin:'0 auto', overflow:'hidden', position:'relative' }}>
+    <div style={{ height:'100vh', display:'flex', flexDirection:'column', background:'#0A0A0A', maxWidth:430, margin:'0 auto', overflow:'hidden', position:'relative' }}>
       {tab==='home'     && <HomeScreen     {...ctx} />}
       {tab==='earnings' && <EarningsScreen {...ctx} />}
       {tab==='profile'  && <ProfileScreen  {...ctx} />}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { sb } from '../lib/supabase'
 import { floorFor } from '../constants'
-const Y='#F5C000', YL='#FFF8D6'
+import { Y, YL } from '../theme'
 const SKILLS=[{id:'elec',ico:'⚡',lbl:'Electrician'},{id:'plumb',ico:'🔧',lbl:'Plumber'},{id:'clean',ico:'🧹',lbl:'Cleaner'},{id:'carpen',ico:'🪚',lbl:'Carpenter'},{id:'paint',ico:'🎨',lbl:'Painter'},{id:'mech',ico:'🔩',lbl:'Mechanic'},{id:'pest',ico:'🐛',lbl:'Pest Control'},{id:'labor',ico:'👷',lbl:'Labourer'}]
 const CITIES=['Bengaluru','Mysuru','Mangaluru','Hubballi','Belagavi','Tumakuru']
 
@@ -15,7 +15,6 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
   const [primary,  setPrimary]  = useState('')
   const [upiId,    setUpiId]    = useState('')
   const [refCode,  setRefCode]  = useState('')
-  const [idType,   setIdType]   = useState('aadhaar')
   const [aaFront,  setAaFront]  = useState(null)  // File object
   const [aaBack,   setAaBack]   = useState(null)
   const [aaPreF,   setAaPreF]   = useState(null)  // Preview URL
@@ -40,11 +39,11 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
   async function uploadKYC(uid) {
     const uploads = []
     if (aaFront) {
-      const { data, error } = await sb.storage.from('kyc').upload(`${uid}/aadhaar-front.jpg`, aaFront, { upsert: true })
+      const { error } = await sb.storage.from('kyc').upload(`${uid}/aadhaar-front.jpg`, aaFront, { upsert: true })
       if (!error) uploads.push('front')
     }
     if (aaBack) {
-      const { data, error } = await sb.storage.from('kyc').upload(`${uid}/aadhaar-back.jpg`, aaBack, { upsert: true })
+      const { error } = await sb.storage.from('kyc').upload(`${uid}/aadhaar-back.jpg`, aaBack, { upsert: true })
       if (!error) uploads.push('back')
     }
     return uploads.length > 0
@@ -57,7 +56,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
 
   async function finish() {
     if (!name || !phone || !city || skills.length===0) { showToast('Fill in all required fields'); return }
-    if (!aaFront || !aaBack) { showToast('Please upload both sides of your ID'); return }
+    if (!aaFront || !aaBack) { showToast('Please upload both sides of Aadhaar'); return }
     setBusy(true)
     try {
       // Upload Aadhaar first
@@ -66,7 +65,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
       const { data, error } = await sb.from('workers').upsert({
         id: user.id, name, phone, city, address, skill: sk, skills,
         onboarding_done: true, trust_score: 60,
-        aadhar_submitted: kycDone, aadhar_verified: false, id_doc_type: idType,
+        aadhar_submitted: kycDone, aadhar_verified: false,
         upi_id: upiId.trim(), price_min: floorFor(sk),
         referral_code: 'KR'+phone.slice(-4)+Math.floor(10+Math.random()*89),
         referred_by: refCode.trim() || null,
@@ -74,7 +73,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
       if (error) { showToast(error.message); return }
       setProfile(data)
       setScreen('main')
-      showToast('Welcome to Kaam Ready! 👷 Your ID is under review.')
+      showToast('Welcome to Kaam Ready! 👷 Your Aadhaar is under review.')
     } catch(e) {
       showToast('Error: ' + e.message)
     } finally {
@@ -82,7 +81,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
     }
   }
 
-  const STEPS = ['Personal Details', 'Your Skills', 'Pricing & UPI', 'ID Verification']
+  const STEPS = ['Personal Details', 'Your Skills', 'Pricing & UPI', 'Aadhaar KYC']
 
   return (
     <div style={{ height:'100vh', background:'#F2F2F7', maxWidth:430, margin:'0 auto', width:'100%', display:'flex', flexDirection:'column' }}>
@@ -149,7 +148,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
                 <p style={{ fontSize:12, fontWeight:700, color:'#555', marginBottom:8 }}>PRIMARY SKILL</p>
                 <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                   {skills.map(id => { const s=SKILLS.find(x=>x.id===id); return (
-                    <button key={id} onClick={() => setPrimary(id)}
+                    <button key={id} type="button" onClick={() => setPrimary(id)}
                       style={{ background:primary===id?Y:'#f9f9f9', border:'2px solid '+(primary===id?Y:'#eee'), borderRadius:10, padding:'7px 14px', fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
                       {s?.ico} {s?.lbl}
                     </button>
@@ -186,27 +185,17 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
         {/* Step 3 — Aadhaar KYC */}
         {step===3 && (
           <div style={{ background:'#fff', borderRadius:20, padding:20, border:'1px solid #eee' }}>
-            <p style={{ fontWeight:800, fontSize:17, marginBottom:6 }}>🛡️ Identity Verification</p>
-            <p style={{ fontSize:13, color:'#888', marginBottom:12 }}>Upload any one government ID. It is stored privately and reviewed only by our admin team — never shown to customers.</p>
-            <div style={{ marginBottom:16 }}>
-              <label style={{ fontSize:12, fontWeight:700, color:'#555', display:'block', marginBottom:6 }}>ID TYPE</label>
-              <select value={idType} onChange={e => setIdType(e.target.value)}
-                style={{ width:'100%', border:'1.5px solid #E5E5EA', borderRadius:12, padding:13, fontSize:14, outline:'none', fontFamily:'inherit', background:'#fff' }}>
-                <option value="aadhaar">Aadhaar (mask the first 8 digits)</option>
-                <option value="voter">Voter ID</option>
-                <option value="dl">Driving Licence</option>
-              </select>
-              {idType==='aadhaar' && <p style={{ fontSize:11, color:'#B8900A', marginTop:6 }}>Tip: cover the first 8 digits of your Aadhaar number with a finger or paper when photographing — we only need your name and photo visible.</p>}
-            </div>
+            <p style={{ fontWeight:800, fontSize:17, marginBottom:6 }}>🛡️ Aadhaar Verification</p>
+            <p style={{ fontSize:13, color:'#888', marginBottom:16 }}>Required for worker safety. Your Aadhaar is encrypted and only reviewed by our admin team.</p>
 
             {[['Front Side', aaFront, aaPreF, f => setAaFront(f), p => setAaPreF(p)],
               ['Back Side',  aaBack,  aaPreB, f => setAaBack(f),  p => setAaPreB(p)]].map(([label, file, prev, setFile, setPrev]) => (
               <div key={label} style={{ marginBottom:16 }}>
-                <label style={{ fontSize:12, fontWeight:700, color:'#555', display:'block', marginBottom:8 }}>ID {label.toUpperCase()}</label>
+                <label style={{ fontSize:12, fontWeight:700, color:'#555', display:'block', marginBottom:8 }}>AADHAAR {label.toUpperCase()}</label>
                 {prev ? (
                   <div style={{ position:'relative' }}>
                     <img src={prev} alt={label} style={{ width:'100%', height:160, objectFit:'cover', borderRadius:12, border:'2px solid #22c55e' }} />
-                    <button onClick={() => { setFile(null); setPrev(null) }}
+                    <button type="button" onClick={() => { setFile(null); setPrev(null) }}
                       style={{ position:'absolute', top:8, right:8, background:'rgba(0,0,0,.6)', border:'none', borderRadius:8, color:'#fff', padding:'4px 8px', cursor:'pointer', fontSize:12 }}>
                       Change
                     </button>
@@ -215,7 +204,7 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
                   <label style={{ display:'block', border:'2px dashed #E5E5EA', borderRadius:12, padding:'28px 20px', textAlign:'center', cursor:'pointer', background:'#fafafa' }}>
                     <div style={{ fontSize:32, marginBottom:8 }}>📷</div>
                     <p style={{ fontSize:13, fontWeight:600, color:'#555' }}>Tap to take photo or upload</p>
-                    <p style={{ fontSize:11, color:'#aaa', marginTop:4 }}>{label} of your ID</p>
+                    <p style={{ fontSize:11, color:'#aaa', marginTop:4 }}>{label} of Aadhaar card</p>
                     <input type="file" accept="image/*" capture="environment" style={{ display:'none' }}
                       onChange={e => pickFile(e, setFile, setPrev)} />
                   </label>
@@ -224,13 +213,13 @@ export default function OnboardScreen({ user, setProfile, setScreen, showToast }
             ))}
             <div style={{ background:'#FFF8D6', borderRadius:12, padding:'10px 14px', display:'flex', gap:8, alignItems:'flex-start' }}>
               <span style={{ fontSize:16 }}>🔒</span>
-              <p style={{ fontSize:12, color:'#666', flex:1 }}>Your ID is stored securely and never shared publicly. Verification takes 24 hours.</p>
+              <p style={{ fontSize:12, color:'#666', flex:1 }}>Your Aadhaar details are stored securely and never shared publicly. Verification takes 24 hours.</p>
             </div>
           </div>
         )}
 
         <div style={{ display:'flex', gap:10 }}>
-          {step>0 && <button onClick={() => setStep(s=>s-1)} style={{ flex:1, background:'#f0f0f0', border:'none', borderRadius:14, padding:15, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>← Back</button>}
+          {step>0 && <button type="button" onClick={() => setStep(s=>s-1)} style={{ flex:1, background:'#f0f0f0', border:'none', borderRadius:14, padding:15, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>← Back</button>}
           <button
             onClick={
               step===0 ? () => { if(!name||!phone||!city){showToast('Fill in all fields');return} setStep(1) }

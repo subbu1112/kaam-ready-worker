@@ -1,22 +1,14 @@
-// Capture install prompt before anything else mounts
-window.__pwaPrompt = null
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault()
-  window.__pwaPrompt = e
-})
-
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import * as Sentry from '@sentry/react'
 import OneSignal from 'react-onesignal'
 import App from './App'
 import './index.css'
-import './animations.css'
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
   integrations: [Sentry.browserTracingIntegration()],
-  tracesSampleRate: 1.0,
+  tracesSampleRate: 0.1,
 })
 
 OneSignal.init({
