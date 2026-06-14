@@ -89,8 +89,8 @@ export default function HelpScreen({ user, onBack, showToast }) {
         <div style={{ background:'#1a1a1a', borderRadius:16, overflow:'hidden', border:'1px solid #2a2a2a' }}>
           {[
             { ico:'🎫', lbl:'Raise a Ticket', sub:'Get help from our team within 4 hours', act:()=>setView('ticket'), hl:true },
-            { ico:'📞', lbl:'Call Support', sub:'1800-KR-HELP (Toll Free)', act:()=>window.location.href='tel:18005747435' },
-            { ico:'💬', lbl:'WhatsApp', sub:'Chat with us instantly', act:()=>window.open('https://wa.me/918012345678?text=Hi+Kaam+Ready+Worker+Support','_blank') },
+            { ico:'📞', lbl:'Call Support', sub:'6362869636', act:()=>window.location.href='tel:6362869636' },
+            { ico:'💬', lbl:'WhatsApp', sub:'Chat with us instantly', act:()=>window.open('https://wa.me/916362869636?text=Hi+Kaam+Ready+Worker+Support','_blank') },
           ].map(({ico,lbl,sub,act,hl}) => (
             <button key={lbl} onClick={act} style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:hl?YL:'none', border:'none', borderBottom:'1px solid #2a2a2a', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
               <div style={{ width:40, height:40, borderRadius:12, background:hl?Y:'#2a2a2a', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>{ico}</div>

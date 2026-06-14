@@ -1,6 +1,7 @@
 import { useState, useEffect, lazy, Suspense, Component } from 'react'
 import { sb } from './lib/supabase'
 import TabBar  from './components/TabBar'
+import NotificationBell from './components/NotificationBell'
 import Toast   from './components/Toast'
 import TermsModal, { termsAccepted, acceptTerms } from './components/TermsModal'
 
@@ -105,6 +106,12 @@ export default function App() {
           overflow:'hidden', position:'relative',
         }}>
           {showTerms && <TermsModal onAccept={() => { acceptTerms(); setShowTerms(false) }} />}
+          {/* Notification bell — floats top-right on main screens */}
+          {!overlay && (
+            <div style={{ position:'absolute', top:8, right:12, zIndex:90 }}>
+              <NotificationBell user={user} />
+            </div>
+          )}
           <TabErrorBoundary>
             {tab === 'home'     && <HomeScreen       {...ctx} />}
             {tab === 'earnings' && <EarningsScreen   {...ctx} />}

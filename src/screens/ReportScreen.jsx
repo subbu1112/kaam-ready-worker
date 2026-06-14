@@ -3,12 +3,14 @@ import { sb } from '../lib/supabase'
 const Y='#F5C000', YD='#B8900A', YL='#FFF8D6', BK='#1C1C1E'
 
 const TYPES = [
-  { id:'customer_abuse',   ico:'😠', label:'Customer Abuse',       desc:'Rude behaviour, threats or harassment' },
-  { id:'fake_booking',     ico:'🎭', label:'Fake Booking',          desc:'Fraudulent booking, no one home repeatedly' },
-  { id:'payment_dispute',  ico:'💸', label:'Payment Dispute',       desc:'Customer refused to pay or paid wrong amount' },
-  { id:'safety',           ico:'⚠️', label:'Safety Concern',        desc:'Felt unsafe at job site' },
-  { id:'app_issue',        ico:'📱', label:'App / Technical Issue', desc:'App bugs, notification issues' },
-  { id:'other',            ico:'📝', label:'Other',                 desc:'Something else' },
+  { id:'customer_complaint',ico:'😠', label:'Customer Complaint',   desc:'Rude behaviour, threats or harassment' },
+  { id:'worker_complaint',  ico:'🗣️', label:'Worker Self-Report',    desc:'Reporting an issue about your own account' },
+  { id:'fake_booking',      ico:'🎭', label:'Fake Booking',          desc:'Fraudulent booking, no one home repeatedly' },
+  { id:'payment_dispute',   ico:'💸', label:'Payment Dispute',       desc:'Customer refused to pay or paid wrong amount' },
+  { id:'safety',            ico:'⚠️', label:'Safety Concern',        desc:'Felt unsafe at job site or during job' },
+  { id:'service_quality',   ico:'👎', label:'Service Quality Issue', desc:'Job done poorly, need to report the quality' },
+  { id:'app_bug',           ico:'🐛', label:'App Bug / Tech Issue',  desc:'App crashes, notifications, login issues' },
+  { id:'other',             ico:'📝', label:'Other',                 desc:'Something else not listed above' },
 ]
 
 export default function ReportScreen({ user, onBack, showToast }) {
