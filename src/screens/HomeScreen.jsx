@@ -14,11 +14,22 @@ export default function HomeScreen({ user, profile, showToast }) {
   const [price,     setPrice]     = useState('')
   const [note,      setNote]      = useState('')
   const [busy,      setBusy]      = useState(false)
-  const [upcoming,  setUpcoming]  = useState([])   // my accepted scheduled jobs
-  const [schedAvail,setSchedAvail]= useState([])   // scheduled jobs anyone can take
+  const [upcoming,  setUpcoming]  = useState([])
+  const [schedAvail,setSchedAvail]= useState([])
   const [photoBusy, setPhotoBusy] = useState(null)
   const timer=useRef(null), chan=useRef(null), jobChan=useRef(null)
+
   useEffect(() => { if(profile) loadTodayStats() }, [profile])
+
+  // Set offline when page closes
+  useEffect(() => {
+    const setOffline = () => {
+      if (user?.id) sb.from('workers').update({ is_online: false }).eq('id', user.id).then(() => {})
+    }
+    window.addEventListener('beforeunload', setOffline)
+    return () => window.removeEventListener('beforeunload', setOffline)
+  }, [user?.id])
+
   // Restore an in-progress job after refresh
   useEffect(() => {
     if (!user?.id) return
@@ -29,51 +40,65 @@ export default function HomeScreen({ user, profile, showToast }) {
         if (j) setActiveJob(prev => prev || j)
       })
   }, [user?.id])
+
   useEffect(() => {
     if(online) subscribeToJobs()
     else { if(chan.current) sb.removeChannel(chan.current); clearTimeout(timer.current); setJobAlert(null) }
     return () => { if(chan.current) sb.removeChannel(chan.current) }
   }, [online])
+
   useEffect(() => {
     if (!user?.id) return
     sb.from('workers').update({ is_online: online }).eq('id', user.id).then(() => {})
     localStorage.setItem('kr_worker_online', online)
   }, [online, user?.id])
-  // Watch the active job for customer payment claims
+
+  // Watch active job for payment status changes
   useEffect(() => {
     if (jobChan.current) { sb.removeChannel(jobChan.current); jobChan.current = null }
     if (!activeJob?.id) return
     jobChan.current = sb.channel('job-'+activeJob.id)
       .on('postgres_changes',{event:'UPDATE',schema:'public',table:'bookings',filter:'id=eq.'+activeJob.id},payload=>{
         setActiveJob(prev => prev ? { ...prev, ...payload.new } : prev)
-        if (payload.new.payment_status==='pending_verification') showToast('Customer paid via UPI — admin is verifying 💸')
+        const ps = payload.new.payment_status
+        if (ps==='pending_verification') showToast('Customer submitted payment — awaiting admin verification 🔍')
+        if (ps==='verified') {
+          showToast('Payment verified by admin ✅ Earnings credited!')
+          loadTodayStats()
+          setTimeout(() => setActiveJob(null), 2000)
+        }
       }).subscribe()
     return () => { if (jobChan.current) sb.removeChannel(jobChan.current) }
   }, [activeJob?.id])
+
   async function loadTodayStats() {
     if(!user) return
     const today=new Date().toISOString().slice(0,10)
-    const { data } = await sb.from('bookings').select('amount').eq('worker_id',user.id).eq('status','completed').gte('created_at',today)
+    const { data } = await sb.from('bookings').select('amount,payment_status')
+      .eq('worker_id',user.id)
+      .in('payment_status',['verified','paid'])
+      .gte('created_at',today)
     if(data) { setTodayJobs(data.length); setTodayEarn(data.reduce((s,b)=>s+(b.amount||0),0)) }
   }
+
   function kmBetween(lat1,lng1,lat2,lng2) {
     if (!lat1||!lng1||!lat2||!lng2) return null
     const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLng=(lng2-lng1)*Math.PI/180
     const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
     return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
   }
-  // Nearest workers get the alert first; farther workers see it only if still unclaimed
+
   function offerJob(b) {
     if (b.city !== profile?.city) return
     let delay = 0
-    if (b.preferred_worker_id && b.preferred_worker_id !== user.id) delay = 60000  // preferred worker gets 60s head start
+    if (b.preferred_worker_id && b.preferred_worker_id !== user.id) delay = 60000
     else if (b.preferred_worker_id === user.id) delay = 0
     else {
       const d = kmBetween(profile?.lat, profile?.lng, b.address_lat, b.address_lng)
       if (d !== null) delay = d <= 5 ? 0 : d <= 10 ? 20000 : 45000
     }
     const show = async () => {
-      if (delay > 0) {  // re-check it wasn't taken meanwhile
+      if (delay > 0) {
         const { data } = await sb.from('bookings').select('status').eq('id', b.id).single()
         if (data?.status !== 'searching') return
       }
@@ -82,17 +107,18 @@ export default function HomeScreen({ user, profile, showToast }) {
     }
     delay === 0 ? show() : setTimeout(show, delay)
   }
+
   function subscribeToJobs() {
     chan.current = sb.channel('new-jobs-'+profile?.city)
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'bookings',filter:'status=eq.searching'},payload=>offerJob(payload.new))
       .subscribe()
-    // Also pick up jobs that were already waiting before we came online
     sb.from('bookings').select('*').eq('status','searching').eq('city', profile?.city)
       .gte('created_at', new Date(Date.now()-3*60*1000).toISOString())
       .order('created_at',{ascending:false}).limit(1)
       .then(({ data }) => { if (data?.[0]) offerJob(data[0]) })
     loadScheduled()
   }
+
   async function loadScheduled() {
     const [avail, mine] = await Promise.all([
       sb.from('bookings').select('*').eq('status','scheduled').is('worker_id', null).eq('city', profile?.city).gte('scheduled_at', new Date().toISOString()).order('scheduled_at').limit(5),
@@ -101,12 +127,14 @@ export default function HomeScreen({ user, profile, showToast }) {
     setSchedAvail(avail.data || [])
     setUpcoming(mine.data || [])
   }
+
   async function acceptScheduled(b) {
     const { error } = await sb.from('bookings').update({ worker_id: user.id, status:'assigned', worker:{ id:user.id, name:profile?.name, skill:profile?.skill, rating:profile?.rating, ico:'👷' } }).eq('id', b.id).is('worker_id', null)
     if (error) { showToast(error.message); return }
     showToast('Scheduled job is yours ✓ 📅')
     loadScheduled()
   }
+
   async function uploadJobPhoto(which, file) {
     if (!activeJob || !file) return
     setPhotoBusy(which)
@@ -121,6 +149,7 @@ export default function HomeScreen({ user, profile, showToast }) {
     } else showToast(error.message)
     setPhotoBusy(null)
   }
+
   function getPosition() {
     return new Promise(res => {
       if (!navigator.geolocation) return res(null)
@@ -129,6 +158,7 @@ export default function HomeScreen({ user, profile, showToast }) {
         ()  => res(null), { enableHighAccuracy: true, timeout: 5000 })
     })
   }
+
   async function acceptJob() {
     if(!jobAlert) return
     const pos = await getPosition()
@@ -137,6 +167,7 @@ export default function HomeScreen({ user, profile, showToast }) {
     await sb.from('bookings').update({status:'assigned',worker_id:user.id,worker:w}).eq('id',jobAlert.id)
     setActiveJob({...jobAlert,status:'assigned',worker:w}); setJobAlert(null); showToast('Job accepted! Navigate to customer 🗺️')
   }
+
   function navigateToCustomer() {
     const j = activeJob
     if (j?.address_lat && j?.address_lng)
@@ -146,7 +177,9 @@ export default function HomeScreen({ user, profile, showToast }) {
       window.open('https://www.google.com/maps/dir/?api=1&destination='+q, '_blank')
     }
   }
+
   function jobFloor(job) { return floorFor(job?.service_id) }
+
   async function submitPrice() {
     if(!activeJob || busy) return
     const p = parseInt(price, 10)
@@ -160,10 +193,13 @@ export default function HomeScreen({ user, profile, showToast }) {
     if (error) { showToast(error.message); return }
     setActiveJob(prev => ({ ...prev, status:'priced', amount:p, price_note:note.trim()||null }))
     setShowPrice(false)
-    showToast('Price sent — waiting for customer to pay via UPI 💳')
+    showToast('Price sent — waiting for customer to pay via UPI to KaamReady 💳')
   }
-  // confirmPayment() removed — only admin can approve payments via the admin dashboard
+
   function toggleOnline() { const next=!online; setOnline(next); showToast(next?'You are now Online 🟢':'You are now Offline') }
+
+  const bookingRef = activeJob?.id ? '#KR-' + activeJob.id.slice(0,8).toUpperCase() : null
+
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <div style={{ background:online?GREEN:'#1C1C1E', padding:'10px 20px 6px', display:'flex', justifyContent:'space-between', transition:'background .3s' }}>
@@ -180,6 +216,7 @@ export default function HomeScreen({ user, profile, showToast }) {
           <div style={{ width:22, height:22, background:'#fff', borderRadius:'50%', position:'absolute', top:3, left:online?27:3, transition:'left .2s', boxShadow:'0 1px 4px rgba(0,0,0,.3)' }} />
         </div>
       </div>
+
       <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:12 }}>
         {!online && !activeJob && (
           <div style={{ background:'#111', borderRadius:20, padding:'28px 24px', textAlign:'center', border:'1.5px dashed #2a2a2a' }}>
@@ -191,7 +228,7 @@ export default function HomeScreen({ user, profile, showToast }) {
         )}
         {online && !jobAlert && !activeJob && (
           <div style={{ background:'#111', border:'1.5px solid '+Y, borderRadius:20, padding:'28px 24px', textAlign:'center' }}>
-            <div style={{ fontSize:44, marginBottom:12, animation:'float 1.5s ease-in-out infinite' }}>🟢</div>
+            <div style={{ fontSize:44, marginBottom:12 }}>🟢</div>
             <p style={{ fontWeight:800, fontSize:16, color:'#fff' }}>{t('Waiting for jobs...')}</p>
             <p style={{ fontSize:13, color:'#636366', marginTop:6 }}>You'll be notified instantly when a job matches</p>
           </div>
@@ -229,7 +266,7 @@ export default function HomeScreen({ user, profile, showToast }) {
           </div>
         )}
         {jobAlert && (
-          <div style={{ background:'#1C1C1E', borderRadius:20, padding:16, border:'2px solid '+Y, animation:'popIn .3s ease' }}>
+          <div style={{ background:'#1C1C1E', borderRadius:20, padding:16, border:'2px solid '+Y }}>
             <h3 style={{ color:Y, fontWeight:800, fontSize:15, marginBottom:12 }}>🔔 {t('New Job Request!')}</h3>
             {[['Service',jobAlert.service],['Address',jobAlert.address],['City',jobAlert.city]].map(([k,v]) => (
               <div key={k} style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
@@ -249,19 +286,21 @@ export default function HomeScreen({ user, profile, showToast }) {
         )}
         {activeJob && (
           <div style={{ background:'#111', borderRadius:20, padding:16, border:'2px solid '+GREEN }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
               <p style={{ fontWeight:800, fontSize:14, color:'#fff' }}>🔧 {t('Active Job')}</p>
-              <span style={{ background:'#D1FAE5', color:'#065F46', fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:8 }}>
-                {activeJob.payment_status==='pending_verification' ? t('Payment Under Review') : activeJob.payment_status==='verified' ? t('Payment Verified') : activeJob.status==='priced' ? t('Awaiting Payment') : t('In Progress')}
+              <span style={{ background: activeJob.payment_status==='verified' ? '#D1FAE5' : activeJob.payment_status==='pending_verification' ? '#E0F2FE' : '#2a2a2a', color: activeJob.payment_status==='verified' ? '#065F46' : activeJob.payment_status==='pending_verification' ? '#0369A1' : '#636366', fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:8 }}>
+                {activeJob.payment_status==='verified' ? '✅ Verified' : activeJob.payment_status==='pending_verification' ? '🔍 Under Review' : activeJob.status==='priced' ? t('Awaiting Payment') : t('In Progress')}
               </span>
             </div>
+            {bookingRef && <p style={{ color:'#636366', fontSize:11, fontFamily:'monospace', marginBottom:10 }}>{bookingRef}</p>}
             {[['Customer',activeJob.customer_name||'—'],['Service',activeJob.service],['Address',activeJob.address]].map(([k,v]) => (
               <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #1a1a1a' }}>
                 <span style={{ fontSize:13, color:'#636366' }}>{k}</span>
                 <span style={{ fontSize:13, fontWeight:600, color:'#fff', maxWidth:'60%', textAlign:'right' }}>{v}</span>
               </div>
             ))}
-            {activeJob.status!=='priced' && !activeJob.payment_status && <>
+            {/* Show map + actions only when job is in progress (no payment yet) */}
+            {!activeJob.payment_status && <>
               <MapView
                 customerLat={activeJob.address_lat} customerLng={activeJob.address_lng}
                 workerLat={activeJob.worker?.lat || profile?.lat} workerLng={activeJob.worker?.lng || profile?.lng}
@@ -270,10 +309,11 @@ export default function HomeScreen({ user, profile, showToast }) {
                 <button onClick={navigateToCustomer} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>🗺️ {t('Directions')}</button>
                 {activeJob.customer_phone
                   ? <a href={'tel:+91'+activeJob.customer_phone} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer', textAlign:'center', textDecoration:'none', color:'#000' }}>📞 {t('Call Customer')}</a>
-                  : <button onClick={() => showToast('Customer phone not available for this booking')} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>📞 Call</button>}
+                  : <button onClick={() => showToast('Customer phone not available')} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>📞 Call</button>}
               </div>
             </>}
-            {activeJob.status!=='priced' && !activeJob.payment_status && (
+            {/* Photo upload — only before price is sent */}
+            {!activeJob.payment_status && activeJob.status!=='priced' && (
               <div style={{ display:'flex', gap:8, marginTop:10 }}>
                 {[['before', activeJob.photo_before_url],['after', activeJob.photo_after_url]].map(([which, url]) => (
                   <label key={which} style={{ flex:1, background: url ? '#0d2818' : '#1C1C1E', border:'1px solid '+(url?GREEN:'#2a2a2a'), borderRadius:12, padding:10, textAlign:'center', cursor:'pointer', fontSize:12, fontWeight:700, color: url ? '#4ade80' : '#888' }}>
@@ -284,51 +324,50 @@ export default function HomeScreen({ user, profile, showToast }) {
                 ))}
               </div>
             )}
-            {activeJob.status!=='priced' && !showPrice && (
+            {/* Set price button — only when no payment_status yet */}
+            {activeJob.status!=='priced' && !activeJob.payment_status && !showPrice && (
               <button onClick={() => { setPrice(''); setNote(''); setShowPrice(true) }} style={{ width:'100%', background:GREEN, color:'#fff', border:'none', borderRadius:14, padding:15, fontWeight:800, fontSize:14, cursor:'pointer', marginTop:10 }}>{t('Work Done — Set Final Price ₹')}</button>
             )}
-            {activeJob.status!=='priced' && showPrice && (
+            {activeJob.status!=='priced' && !activeJob.payment_status && showPrice && (
               <div style={{ background:'#1C1C1E', borderRadius:14, padding:14, marginTop:10 }}>
                 <p style={{ color:Y, fontWeight:800, fontSize:13, marginBottom:4 }}>Final Price</p>
-                <p style={{ color:'#636366', fontSize:11, marginBottom:10 }}>Minimum: ₹{jobFloor(activeJob)} — price the job fairly, the customer approves it before paying</p>
+                <p style={{ color:'#636366', fontSize:11, marginBottom:10 }}>Minimum: ₹{jobFloor(activeJob)} — price fairly, customer approves before paying</p>
                 <input value={price} onChange={e => setPrice(e.target.value.replace(/\D/g,'').slice(0,5))} type="tel" placeholder="₹ amount"
                   style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:12, fontSize:15, fontWeight:700, color:'#fff', outline:'none', fontFamily:'inherit', marginBottom:8 }} />
                 <input value={note} onChange={e => setNote(e.target.value.slice(0,120))} placeholder="Why this price? e.g. extra wiring replaced"
                   style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:12, fontSize:13, color:'#fff', outline:'none', fontFamily:'inherit', marginBottom:10 }} />
                 <div style={{ display:'flex', gap:8 }}>
                   <button onClick={() => setShowPrice(false)} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:10, padding:12, fontWeight:700, fontSize:13, cursor:'pointer' }}>Cancel</button>
-                  <button onClick={submitPrice} disabled={busy} style={{ flex:2, background:Y, border:'none', borderRadius:10, padding:12, fontWeight:800, fontSize:13, cursor:'pointer', opacity:busy?.6:1 }}>{busy?'...':t('Send to Customer →')}</button>
+                  <button onClick={submitPrice} disabled={busy} style={{ flex:2, background:Y, border:'none', borderRadius:10, padding:12, fontWeight:800, fontSize:13, cursor:'pointer', opacity:busy?0.6:1 }}>{busy?'...':t('Send to Customer →')}</button>
                 </div>
               </div>
             )}
+            {/* Awaiting payment — price locked, no edit button once customer has payment_status */}
             {activeJob.status==='priced' && !activeJob.payment_status && (
               <div style={{ background:'#1C1C1E', borderRadius:14, padding:16, marginTop:10, textAlign:'center' }}>
                 <div style={{ fontSize:30, marginBottom:8 }}>⏳</div>
                 <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>₹{activeJob.amount} sent to customer</p>
-                <p style={{ color:'#636366', fontSize:12, marginTop:4 }}>Waiting for them to pay via UPI...</p>
-                <button onClick={() => { setPrice(String(activeJob.amount||'')); setNote(activeJob.price_note||''); setActiveJob(p=>({...p,status:'assigned'})); setShowPrice(true) }}
-                  style={{ marginTop:12, background:'none', border:'1px solid #2a2a2a', borderRadius:10, color:'#636366', padding:'8px 16px', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>Edit price</button>
+                <p style={{ color:'#636366', fontSize:12, marginTop:4 }}>Waiting for them to pay via UPI to KaamReady...</p>
               </div>
             )}
-            {(activeJob.payment_status==='pending_verification' || activeJob.payment_status==='verified') && (
+            {/* Customer paid — waiting for admin verification */}
+            {activeJob.payment_status==='pending_verification' && (
+              <div style={{ background:'#0d1f35', border:'1px solid #3b82f6', borderRadius:14, padding:16, marginTop:10, textAlign:'center' }}>
+                <div style={{ fontSize:30, marginBottom:8 }}>🔍</div>
+                <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>Customer paid ₹{activeJob.amount}</p>
+                <p style={{ color:'#9ca3af', fontSize:12, margin:'4px 0 0' }}>KaamReady admin is verifying the payment. Your earnings will be credited once verified.</p>
+              </div>
+            )}
+            {/* Payment verified by admin */}
+            {activeJob.payment_status==='verified' && (
               <div style={{ background:'#0d2818', border:'1px solid '+GREEN, borderRadius:14, padding:16, marginTop:10, textAlign:'center' }}>
-                <div style={{ fontSize:30, marginBottom:8 }}>{activeJob.payment_status==='verified'?'✅':'⏳'}</div>
-                <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>
-                  {activeJob.payment_status==='verified'
-                    ? 'Payment verified — job complete!'
-                    : 'Customer marked payment sent'}
-                </p>
-                <p style={{ color:'#9ca3af', fontSize:12, margin:'4px 0 0' }}>
-                  {activeJob.payment_status==='verified'
-                    ? 'Your earnings have been credited to your wallet 💰'
-                    : 'KaamReady admin is verifying the UPI payment...'}
-                </p>
-                {activeJob.payment_status==='verified' && (
-                  <button onClick={() => { setActiveJob(null); setPrice(''); setNote('') }}
-                    style={{ marginTop:12, background:GREEN, color:'#fff', border:'none', borderRadius:12, padding:'12px 24px', fontWeight:800, fontSize:14, cursor:'pointer' }}>
-                    Done ✓
-                  </button>
-                )}
+                <div style={{ fontSize:30, marginBottom:8 }}>✅</div>
+                <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>Payment verified!</p>
+                <p style={{ color:'#4ade80', fontSize:13, marginTop:4 }}>₹{Math.round((activeJob.amount||0)*0.9)} credited to your wallet 💰</p>
+                <button onClick={() => { setActiveJob(null); setPrice(''); setNote('') }}
+                  style={{ marginTop:12, background:GREEN, color:'#fff', border:'none', borderRadius:10, padding:'10px 20px', fontWeight:800, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+                  Done ✓
+                </button>
               </div>
             )}
           </div>

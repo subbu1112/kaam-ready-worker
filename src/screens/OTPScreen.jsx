@@ -1,12 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { sb } from '../lib/supabase'
 const Y = '#F5C000'
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export default function OTPScreen({ setScreen, showToast }) {
-  const [otp,  setOtp]  = useState(['','','','','',''])
-  const [busy, setBusy] = useState(false)
+  const [otp,       setOtp]       = useState(['','','','','',''])
+  const [busy,      setBusy]      = useState(false)
+  const [resending, setResending] = useState(false)
+  const [cooldown,  setCooldown]  = useState(30)
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setCooldown(c => { if (c <= 1) { clearInterval(id); return 0 } return c - 1 })
+    }, 1000)
+    return () => clearInterval(id)
+  }, [])
 
   function handleKey(i, val) {
     val = val.replace(/\D/g,'').slice(-1)
@@ -18,7 +27,7 @@ export default function OTPScreen({ setScreen, showToast }) {
     const code = otp.join('')
     if (code.length < 6) { showToast('Enter all 6 digits'); return }
     setBusy(true)
-    const phone = localStorage.getItem('kr_worker_phone') || ''
+    const phone = sessionStorage.getItem('kr_worker_phone') || ''
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/verify-otp`, {
         method: 'POST',
@@ -33,6 +42,7 @@ export default function OTPScreen({ setScreen, showToast }) {
         type: 'email',
       })
       if (error) { showToast('Auth error: ' + error.message); return }
+      sessionStorage.removeItem('kr_worker_phone')
     } catch {
       showToast('Network error — try again')
     } finally {
@@ -40,12 +50,35 @@ export default function OTPScreen({ setScreen, showToast }) {
     }
   }
 
+  async function resendOTP() {
+    const phone = sessionStorage.getItem('kr_worker_phone') || ''
+    if (!phone) { showToast('Phone not found — go back and try again'); return }
+    setResending(true)
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON },
+        body: JSON.stringify({ phone }),
+      })
+      const data = await res.json()
+      if (!res.ok) { showToast(data.error || 'Failed to resend OTP'); return }
+      showToast('New OTP sent!')
+      setOtp(['','','','','',''])
+      document.getElementById('wo0')?.focus()
+      setCooldown(30)
+      const id = setInterval(() => {
+        setCooldown(c => { if (c <= 1) { clearInterval(id); return 0 } return c - 1 })
+      }, 1000)
+    } catch { showToast('Network error — try again') }
+    finally { setResending(false) }
+  }
+
   return (
     <div style={{ height:'100vh', background:'#0A0A0A', maxWidth:430, margin:'0 auto', width:'100%', display:'flex', flexDirection:'column' }}>
       <div style={{ background:Y, padding:'16px 24px 20px' }}>
         <button onClick={() => setScreen('login')} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer' }}>←</button>
         <h2 style={{ fontWeight:800, fontSize:20, marginTop:8 }}>Enter OTP</h2>
-        <p style={{ fontSize:13, color:'rgba(0,0,0,.6)' }}>6-digit code sent to your number</p>
+        <p style={{ fontSize:13, color:'rgba(0,0,0,.6)' }}>6-digit code sent to +91 {sessionStorage.getItem('kr_worker_phone') || '••••••••••'}</p>
       </div>
       <div style={{ padding:24, flex:1 }}>
         <div style={{ background:'#111', borderRadius:20, padding:20, border:'1px solid #222' }}>
@@ -53,6 +86,7 @@ export default function OTPScreen({ setScreen, showToast }) {
             {otp.map((v,i) => (
               <input key={i} id={'wo'+i} maxLength={1} inputMode="numeric" value={v}
                 onChange={e => handleKey(i, e.target.value)}
+                onKeyDown={e => { if (e.key==='Backspace' && !v && i>0) document.getElementById('wo'+(i-1))?.focus() }}
                 style={{ width:46, height:54, border:'2px solid #2a2a2a', borderRadius:12,
                   textAlign:'center', fontSize:22, fontWeight:700, outline:'none',
                   fontFamily:'inherit', background:'#1a1a1a', color:'#fff' }} />
@@ -62,6 +96,15 @@ export default function OTPScreen({ setScreen, showToast }) {
             style={{ width:'100%', background:Y, border:'none', borderRadius:14, padding:16, fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'inherit', opacity:busy?0.6:1 }}>
             {busy ? 'Verifying...' : 'Verify & Enter →'}
           </button>
+          <div style={{ textAlign:'center', marginTop:14 }}>
+            {cooldown > 0
+              ? <p style={{ fontSize:13, color:'#555' }}>Resend OTP in {cooldown}s</p>
+              : <button onClick={resendOTP} disabled={resending}
+                  style={{ background:'none', border:'none', color:Y, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                  {resending ? 'Sending...' : 'Resend OTP'}
+                </button>
+            }
+          </div>
         </div>
       </div>
     </div>
