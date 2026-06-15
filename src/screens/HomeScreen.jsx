@@ -199,6 +199,8 @@ export default function HomeScreen({ user, profile, showToast }) {
   function toggleOnline() { const next=!online; setOnline(next); showToast(next?'You are now Online 🟢':'You are now Offline') }
 
   const bookingRef = activeJob?.id ? '#KR-' + activeJob.id.slice(0,8).toUpperCase() : null
+  // 'pending' = booking created, worker not yet priced — treat same as null (no payment started)
+  const paymentStarted = ps => ps && ps !== 'pending'
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -300,7 +302,7 @@ export default function HomeScreen({ user, profile, showToast }) {
               </div>
             ))}
             {/* Show map + actions only when job is in progress (no payment yet) */}
-            {!activeJob.payment_status && <>
+            {!paymentStarted(activeJob.payment_status) && <>
               <MapView
                 customerLat={activeJob.address_lat} customerLng={activeJob.address_lng}
                 workerLat={activeJob.worker?.lat || profile?.lat} workerLng={activeJob.worker?.lng || profile?.lng}
@@ -313,7 +315,7 @@ export default function HomeScreen({ user, profile, showToast }) {
               </div>
             </>}
             {/* Photo upload — only before price is sent */}
-            {!activeJob.payment_status && activeJob.status!=='priced' && (
+            {!paymentStarted(activeJob.payment_status) && activeJob.status!=='priced' && (
               <div style={{ display:'flex', gap:8, marginTop:10 }}>
                 {[['before', activeJob.photo_before_url],['after', activeJob.photo_after_url]].map(([which, url]) => (
                   <label key={which} style={{ flex:1, background: url ? '#0d2818' : '#1C1C1E', border:'1px solid '+(url?GREEN:'#2a2a2a'), borderRadius:12, padding:10, textAlign:'center', cursor:'pointer', fontSize:12, fontWeight:700, color: url ? '#4ade80' : '#888' }}>
@@ -325,10 +327,10 @@ export default function HomeScreen({ user, profile, showToast }) {
               </div>
             )}
             {/* Set price button — only when no payment_status yet */}
-            {activeJob.status!=='priced' && !activeJob.payment_status && !showPrice && (
+            {activeJob.status!=='priced' && !paymentStarted(activeJob.payment_status) && !showPrice && (
               <button onClick={() => { setPrice(''); setNote(''); setShowPrice(true) }} style={{ width:'100%', background:GREEN, color:'#fff', border:'none', borderRadius:14, padding:15, fontWeight:800, fontSize:14, cursor:'pointer', marginTop:10 }}>{t('Work Done — Set Final Price ₹')}</button>
             )}
-            {activeJob.status!=='priced' && !activeJob.payment_status && showPrice && (
+            {activeJob.status!=='priced' && !paymentStarted(activeJob.payment_status) && showPrice && (
               <div style={{ background:'#1C1C1E', borderRadius:14, padding:14, marginTop:10 }}>
                 <p style={{ color:Y, fontWeight:800, fontSize:13, marginBottom:4 }}>Final Price</p>
                 <p style={{ color:'#636366', fontSize:11, marginBottom:10 }}>Minimum: ₹{jobFloor(activeJob)} — price fairly, customer approves before paying</p>
@@ -342,8 +344,8 @@ export default function HomeScreen({ user, profile, showToast }) {
                 </div>
               </div>
             )}
-            {/* Awaiting payment — price locked, no edit button once customer has payment_status */}
-            {activeJob.status==='priced' && !activeJob.payment_status && (
+            {/* Awaiting payment — price sent, customer hasn't paid yet */}
+            {activeJob.status==='priced' && !paymentStarted(activeJob.payment_status) && (
               <div style={{ background:'#1C1C1E', borderRadius:14, padding:16, marginTop:10, textAlign:'center' }}>
                 <div style={{ fontSize:30, marginBottom:8 }}>⏳</div>
                 <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>₹{activeJob.amount} sent to customer</p>
@@ -375,12 +377,4 @@ export default function HomeScreen({ user, profile, showToast }) {
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
           {[['₹'+todayEarn.toLocaleString('en-IN'),t('Today')],[todayJobs,t('Jobs done')],[(profile?.rating||5.0)+'⭐',t('Rating')]].map(([v,l]) => (
             <div key={l} style={{ background:YL, borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
-              <div style={{ fontSize:17, fontWeight:800 }}>{v}</div>
-              <div style={{ fontSize:10, color:'#888', marginTop:2 }}>{l}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
+              <div
