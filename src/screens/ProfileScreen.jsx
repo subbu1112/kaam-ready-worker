@@ -201,4 +201,55 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile 
         {profile?.email && <p style={{ fontSize:12, color:'#444', marginTop:1 }}>{profile.email}</p>}
 
         <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:14, flexWrap:'wrap' }}>
-          <span style={{ background:YL, color:YD, fontSize:11, fontW
+          <span style={{ background:YL, color:YD, fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8 }}>
+            ⭐ {profile?.rating || 5.0} Rating
+          </span>
+          <span style={{ background:'#1a2e1a', color:GREEN, fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8 }}>
+            {profile?.total_jobs || 0} Jobs
+          </span>
+          <span style={{ background: profile?.is_online ? '#1a2e1a' : '#2a2a2a', color: profile?.is_online ? GREEN : '#555', fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8 }}>
+            {profile?.is_online ? '🟢 Online' : '⚫ Offline'}
+          </span>
+        </div>
+
+        {/* KYC warning */}
+        {!profile?.aadhar_submitted && (
+          <div style={{ background:'#2d1a00', borderRadius:10, padding:'10px 14px', marginTop:14, border:'1px solid #f59e0b' }}
+            onClick={() => setModal('kyc')}>
+            <p style={{ color:'#f59e0b', fontWeight:700, fontSize:12 }}>⚠️ KYC pending — tap to submit Aadhaar</p>
+          </div>
+        )}
+      </div>
+
+      {/* Stats row */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+        {[['Wallet','₹'+(profile?.wallet_balance||0).toLocaleString('en-IN'),GREEN],
+          ['Trust Score',(profile?.trust_score||100)+'%',Y],
+          ['Credit','₹'+(profile?.credit_balance||0),('#60a5fa')]].map(([l,v,c]) => (
+          <div key={l} style={{ background:'#1a1a1a', borderRadius:14, padding:'12px 10px', border:'1px solid #2a2a2a', textAlign:'center' }}>
+            <p style={{ color:c, fontWeight:900, fontSize:16 }}>{v}</p>
+            <p style={{ color:'#555', fontSize:10, marginTop:3 }}>{l}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Menu */}
+      <div style={{ background:'#1a1a1a', borderRadius:20, border:'1px solid #2a2a2a', overflow:'hidden' }}>
+        {menus.map(({ ico, label, bg, action }) => (
+          <div key={label} onClick={action}
+            style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderBottom:'1px solid #222', cursor:'pointer' }}>
+            <div style={{ width:36, height:36, borderRadius:10, background:bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>{ico}</div>
+            <span style={{ fontSize:15, fontWeight:500, flex:1, color:'#fff' }}>{label}</span>
+            <span style={{ color:'#333', fontSize:18 }}>›</span>
+          </div>
+        ))}
+      </div>
+
+      <button onClick={signOut} disabled={signingOut}
+        style={{ width:'100%', background:'transparent', border:'1.5px solid #dc2626', borderRadius:14, padding:15, color:'#ef4444', fontWeight:700, fontSize:15, cursor:'pointer', fontFamily:'inherit', opacity:signingOut?0.6:1 }}>
+        {signingOut ? 'Signing out...' : '🚪 Sign Out'}
+      </button>
+      <p style={{ textAlign:'center', fontSize:11, color:'#333', paddingBottom:8 }}>Kaam Ready v2.0 — Karnataka 🇮🇳</p>
+    </div>
+  )
+}

@@ -291,4 +291,18 @@ export default function OnboardScreen({ user, showToast, setScreen, setProfile }
               ← Back
             </button>
           )}
-       
+          {step === 4 && (
+            <button onClick={() => finish()}
+              style={{ background:'transparent', border:'1.5px solid #444', borderRadius:14, padding:'15px 20px', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit', color:'#666' }}>
+              Skip PAN
+            </button>
+          )}
+          <button onClick={nextStep} disabled={saving}
+            style={{ flex:2, background:Y, border:'none', borderRadius:14, padding:15, fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'inherit', opacity:saving?0.6:1 }}>
+            {saving ? 'Submitting...' : step === 4 ? 'Complete Registration ✓' : 'Continue →'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -193,4 +193,36 @@ export default function SettingsScreen({ user, profile, onBack, showToast }) {
               {[
                 { ico: '🔒', title: 'Change Password', desc: 'Update your account password', action: () => showToast('A password reset link will be sent to your email') },
                 { ico: '📋', title: 'Download My Data', desc: 'Export all your job and earnings data', action: () => showToast('Data export will be sent to your registered email within 24 hours') },
-                { ico: '
+                { ico: '👁️', title: 'Profile Visibility', desc: 'Your profile is visible to customers in your city when online', action: () => {} },
+                { ico: '📍', title: 'Location Sharing', desc: 'Shared with customers only during active jobs', action: () => {} },
+              ].map(({ ico, title, desc, action }) => (
+                <div key={title} onClick={action}
+                  style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 0', borderBottom: '1px solid #2a2a2a', cursor: 'pointer' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>{ico}</div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{title}</p>
+                    <p style={{ fontSize: 12, color: '#555', marginTop: 3 }}>{desc}</p>
+                  </div>
+                  <span style={{ color: '#333', fontSize: 16, marginTop: 2 }}>›</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ background: '#1a1a1a', borderRadius: 16, padding: 16, border: '1.5px solid #dc2626' }}>
+              <p style={{ color: '#ef4444', fontWeight: 800, fontSize: 14, marginBottom: 8 }}>⚠️ Danger Zone</p>
+              <p style={{ fontSize: 12, color: '#555', marginBottom: 14, lineHeight: 1.6 }}>
+                Deleting your account will permanently remove all your data, job history, and earnings records. This action cannot be reversed.
+              </p>
+              <button onClick={deleteAccount}
+                style={{ width: '100%', background: 'transparent', border: '1.5px solid #dc2626', borderRadius: 12, padding: 13, color: '#ef4444', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Delete Account
+              </button>
+            </div>
+          </>
+        )}
+
+        <div style={{ height: 16 }} />
+      </div>
+    </div>
+  )
+}

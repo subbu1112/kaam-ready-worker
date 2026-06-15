@@ -377,4 +377,12 @@ export default function HomeScreen({ user, profile, showToast }) {
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
           {[['₹'+todayEarn.toLocaleString('en-IN'),t('Today')],[todayJobs,t('Jobs done')],[(profile?.rating||5.0)+'⭐',t('Rating')]].map(([v,l]) => (
             <div key={l} style={{ background:YL, borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
-              <div
+              <div style={{ fontSize:17, fontWeight:800 }}>{v}</div>
+              <div style={{ fontSize:10, color:'#888', marginTop:2 }}>{l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}

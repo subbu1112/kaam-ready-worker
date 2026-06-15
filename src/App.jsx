@@ -84,4 +84,31 @@ export default function App() {
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(null), 2600) }
 
-  const ctx = {
+  const ctx = { user, profile, setProfile, setScreen, setTab, showToast, reloadProfile: () => user && loadProfile(user.id) }
+
+  return (
+    <Suspense fallback={<PageLoader />}>
+      {screen === 'login'   && <><LoginScreen   {...ctx} />{toast && <Toast msg={toast} />}</>}
+      {screen === 'otp'     && <><OTPScreen     {...ctx} />{toast && <Toast msg={toast} />}</>}
+      {screen === 'onboard' && <><OnboardScreen {...ctx} />{toast && <Toast msg={toast} />}</>}
+      {screen === 'main'    && (
+        <div style={{
+          height:'100vh', display:'flex', flexDirection:'column',
+          background:'#111', maxWidth:430, margin:'0 auto',
+          overflow:'hidden', position:'relative',
+        }}>
+          {showTerms && <TermsModal onAccept={() => { acceptTerms(); setShowTerms(false) }} />}
+          <TabErrorBoundary>
+            {tab === 'home'     && <HomeScreen       {...ctx} />}
+            {tab === 'earnings' && <EarningsScreen   {...ctx} />}
+            {tab === 'history'  && <JobHistoryScreen {...ctx} />}
+            {tab === 'settings' && <SettingsScreen   {...ctx} />}
+            {tab === 'profile'  && <ProfileScreen    {...ctx} />}
+          </TabErrorBoundary>
+          <TabBar tab={tab} setTab={setTab} />
+          {toast && <Toast msg={toast} />}
+        </div>
+      )}
+    </Suspense>
+  )
+}
