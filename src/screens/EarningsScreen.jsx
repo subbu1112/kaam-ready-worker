@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { sb } from '../lib/supabase'
+import { loadSettings, workerShareFraction } from '../lib/settings'
 const Y='#F5C000', YD='#B8900A', YL='#FFF8D6', GREEN='#22c55e', BK='#1C1C1E'
 
 const PERIODS = ['Today', 'This Week', 'This Month', 'All Time']
@@ -20,6 +21,10 @@ export default function EarningsScreen({ user, profile }) {
   const [payouts,  setPayouts]  = useState([])
   const [loading,  setLoading]  = useState(true)
   const [tab,      setTab]      = useState('earnings')
+  const [share,    setShare]    = useState(workerShareFraction())
+  const sharePct = Math.round(share * 100)
+
+  useEffect(() => { loadSettings().then(() => setShare(workerShareFraction())) }, [])
 
   const load = useCallback(async () => {
     if (!user) return
@@ -53,7 +58,7 @@ export default function EarningsScreen({ user, profile }) {
 
   const completed  = bookings.filter(b => b.status === 'completed')
   const totalGross = completed.reduce((s, b) => s + (b.amount || 0), 0)
-  const myEarnings = Math.round(totalGross * 0.90)
+  const myEarnings = Math.round(totalGross * share)
 
   const pendingPayouts   = payouts.filter(p => p.status === 'pending')
   const completedPayouts = payouts.filter(p => p.status === 'paid')
@@ -62,11 +67,11 @@ export default function EarningsScreen({ user, profile }) {
 
   function downloadCSV() {
     const rows = [
-      ['Date', 'Service', 'Customer', 'City', 'Gross Amount', 'Your Earnings (90%)', 'Status'],
+      ['Date', 'Service', 'Customer', 'City', 'Gross Amount', 'Your Earnings ('+sharePct+'%)', 'Status'],
       ...completed.map(b => [
         new Date(b.created_at).toLocaleDateString('en-IN'),
         b.service, b.customer_name || '', b.city || '',
-        b.amount || 0, Math.round((b.amount || 0) * 0.9), b.status,
+        b.amount || 0, Math.round((b.amount || 0) * share), b.status,
       ])
     ]
     const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
@@ -109,7 +114,7 @@ export default function EarningsScreen({ user, profile }) {
         </div>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:12 }}>
+      <div style={{ flex:1, minHeight:0, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:12 }}>
         {loading ? (
           <div style={{ display:'flex', justifyContent:'center', padding:40 }}>
             <div style={{ width:32, height:32, border:'3px solid #333', borderTop:'3px solid '+Y, borderRadius:'50%', animation:'spin .8s linear infinite' }} />
@@ -120,7 +125,7 @@ export default function EarningsScreen({ user, profile }) {
             {/* Stat cards */}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
               <StatCard label="Jobs Done" value={completed.length} sub={period} color={Y} />
-              <StatCard label="My Earnings (90%)" value={fmt(myEarnings)} sub={'Gross: '+fmt(totalGross)} color={GREEN} />
+              <StatCard label={'My Earnings ('+sharePct+'%)'} value={fmt(myEarnings)} sub={'Gross: '+fmt(totalGross)} color={GREEN} />
               <StatCard label="Pending Payout" value={fmt(pendingTotal)} sub={pendingPayouts.length+' payout(s)'} color="#f59e0b" />
               <StatCard label="Total Paid Out" value={fmt(paidTotal)} sub={completedPayouts.length+' payment(s)'} color="#60a5fa" />
             </div>
@@ -155,7 +160,7 @@ export default function EarningsScreen({ user, profile }) {
                         <p style={{ fontSize:11, color:'#444', marginTop:2 }}>{fmtDate(b.created_at)}</p>
                       </div>
                       <div style={{ textAlign:'right' }}>
-                        <p style={{ fontWeight:900, color:GREEN, fontSize:16 }}>{fmt(Math.round((b.amount||0)*0.9))}</p>
+                        <p style={{ fontWeight:900, color:GREEN, fontSize:16 }}>{fmt(Math.round((b.amount||0)*share))}</p>
                         <p style={{ fontSize:10, color:'#444', marginTop:2 }}>gross {fmt(b.amount)}</p>
                       </div>
                     </div>

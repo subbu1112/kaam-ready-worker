@@ -63,6 +63,19 @@ export default function LoginScreen({ setScreen, showToast }) {
     finally { setBusy(false) }
   }
 
+  async function googleAuth() {
+    setBusy(true)
+    try {
+      const { sb } = await import('../lib/supabase')
+      const { error } = await sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      })
+      if (error) showToast(error.message)
+    } catch (e) { showToast('Error: ' + e.message) }
+    finally { setBusy(false) }
+  }
+
   const inp = (val, set, placeholder, type='text') => (
     <input value={val} onChange={e => set(e.target.value)} placeholder={placeholder} type={type}
       style={{ width:'100%', border:'1.5px solid #2a2a2a', borderRadius:12, padding:'13px 14px',
@@ -161,6 +174,24 @@ export default function LoginScreen({ setScreen, showToast }) {
             )}
           </div>
         )}
+
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ flex:1, height:1, background:'#222' }} />
+          <span style={{ fontSize:12, color:'#555' }}>or</span>
+          <div style={{ flex:1, height:1, background:'#222' }} />
+        </div>
+        <button onClick={googleAuth} disabled={busy}
+          style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, width:'100%',
+            background:'#fff', border:'none', borderRadius:14, padding:'14px', fontSize:14, fontWeight:700,
+            cursor:'pointer', fontFamily:'inherit', color:'#1C1C1E', opacity:busy?0.6:1 }}>
+          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+            <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-22 0-1.2-.1-2.3-.4-3.5z"/>
+            <path fill="#FF3D00" d="M3.3 12.7l6.6 4.8C11.5 14 17.3 10 24 10c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 4.1 29.6 2 24 2 15.3 2 7.8 6.9 3.3 12.7z"/>
+            <path fill="#4CAF50" d="M24 46c5.5 0 10.4-2.1 14.1-5.5l-6.5-5.5C29.6 36.8 26.9 38 24 38c-5.2 0-9.6-3.3-11.2-8l-6.6 5C9.7 41 16.3 46 24 46z"/>
+            <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6.5 5.5C40.9 36.3 45 31 45 24c0-1.2-.1-2.3-.4-3.5z"/>
+          </svg>
+          Continue with Google
+        </button>
       </div>
     </div>
   )

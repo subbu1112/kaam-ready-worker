@@ -13,6 +13,9 @@ Sentry.init({
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />)
 
+// No service worker: unregister any leftover SW so the app always loads fresh.
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'))
+  navigator.serviceWorker.getRegistrations()
+    .then((rs) => rs.forEach((r) => r.unregister()))
+    .catch(() => {})
 }

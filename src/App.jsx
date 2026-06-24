@@ -12,6 +12,9 @@ const EarningsScreen   = lazy(() => import('./screens/EarningsScreen'))
 const ProfileScreen    = lazy(() => import('./screens/ProfileScreen'))
 const JobHistoryScreen = lazy(() => import('./screens/JobHistoryScreen'))
 const SettingsScreen   = lazy(() => import('./screens/SettingsScreen'))
+const WalletScreen        = lazy(() => import('./screens/WalletScreen'))
+const RewardsScreen       = lazy(() => import('./screens/RewardsScreen'))
+const NotificationsScreen = lazy(() => import('./screens/NotificationsScreen'))
 
 class TabErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
@@ -63,7 +66,20 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  async function logConsentOnce(uid) {
+    try {
+      if (localStorage.getItem('kr_consent_logged') === uid) return
+      await sb.from('consent_logs').insert({
+        user_id: uid, role: 'worker',
+        consented_to: 'terms_and_privacy', consent_version: '2025-06',
+        user_agent: navigator.userAgent,
+      })
+      localStorage.setItem('kr_consent_logged', uid)
+    } catch { /* non-blocking */ }
+  }
+
   async function loadProfile(uid) {
+    logConsentOnce(uid)
     const { data } = await sb.from('workers')
       .select(`id,name,phone,city,address,skill,skills,email,alternate_phone,
                kyc_status,onboarding_done,upi_id,account_status,is_online,
@@ -71,7 +87,7 @@ export default function App() {
                aadhar_submitted,aadhar_verified,aadhar_front_url,aadhar_back_url,
                pan_submitted,pan_verified,pan_front_url,pan_number,aadhaar_number,
                service_radius_km,working_hours_start,working_hours_end,
-               referral_code,credit_balance,price_min,bank_account,bank_ifsc,bank_name`)
+               referral_code,credit_balance,price_min,bank_account,bank_ifsc,bank_name,payout_method`)
       .eq('id', uid).single()
     if (data) {
       setProfile(data)
@@ -93,17 +109,21 @@ export default function App() {
       {screen === 'onboard' && <><OnboardScreen {...ctx} />{toast && <Toast msg={toast} />}</>}
       {screen === 'main'    && (
         <div style={{
-          height:'100vh', display:'flex', flexDirection:'column',
-          background:'#111', maxWidth:430, margin:'0 auto',
-          overflow:'hidden', position:'relative',
+          position:'fixed', top:0, bottom:0, left:'50%', transform:'translateX(-50%)',
+          width:'100%', maxWidth:430,
+          display:'flex', flexDirection:'column',
+          background:'#111', overflow:'hidden',
         }}>
           {showTerms && <TermsModal onAccept={() => { acceptTerms(); setShowTerms(false) }} />}
           <TabErrorBoundary>
-            {tab === 'home'     && <HomeScreen       {...ctx} />}
-            {tab === 'earnings' && <EarningsScreen   {...ctx} />}
-            {tab === 'history'  && <JobHistoryScreen {...ctx} />}
-            {tab === 'settings' && <SettingsScreen   {...ctx} />}
-            {tab === 'profile'  && <ProfileScreen    {...ctx} />}
+            {tab === 'home'          && <HomeScreen          {...ctx} />}
+            {tab === 'earnings'      && <EarningsScreen      {...ctx} />}
+            {tab === 'wallet'        && <WalletScreen        {...ctx} />}
+            {tab === 'rewards'       && <RewardsScreen       {...ctx} />}
+            {tab === 'notifications' && <NotificationsScreen {...ctx} />}
+            {tab === 'history'       && <JobHistoryScreen    {...ctx} />}
+            {tab === 'settings'      && <SettingsScreen      {...ctx} onBack={() => setTab('profile')} />}
+            {tab === 'profile'       && <ProfileScreen       {...ctx} />}
           </TabErrorBoundary>
           <TabBar tab={tab} setTab={setTab} />
           {toast && <Toast msg={toast} />}

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { sb } from '../lib/supabase'
+import { getLang, setLang, LANGS, t } from '../i18n'
 const Y = '#F5C000', YD = '#B8900A', YL = '#FFF8D6', BK = '#1C1C1E', GREEN = '#22c55e'
 
 const CITIES = ['Bengaluru', 'Mysuru', 'Mangaluru', 'Hubballi', 'Belagavi', 'Tumakuru', 'Shivamogga', 'Davangere', 'Kalaburagi', 'Udupi']
@@ -27,6 +28,13 @@ export default function SettingsScreen({ user, profile, onBack, showToast }) {
   const [notifPromo,    setNotifPromo]   = useState(false)
   const [saving,        setSaving]       = useState(false)
   const [section,       setSection]      = useState('profile')
+  const [lang,          setLangState]    = useState(getLang())
+
+  function changeLang(code) {
+    setLang(code); setLangState(code)
+    showToast && showToast('Language updated')
+    setTimeout(() => window.location.reload(), 400)
+  }
 
   async function saveProfile() {
     if (!name.trim()) { showToast('Name is required'); return }
@@ -80,7 +88,22 @@ export default function SettingsScreen({ user, profile, onBack, showToast }) {
         ))}
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+        {/* ── Language (always visible) ── */}
+        <div style={{ background: '#1a1a1a', borderRadius: 16, padding: 16, border: '1px solid #2a2a2a' }}>
+          <p style={{ color: Y, fontWeight: 800, fontSize: 14, marginBottom: 12 }}>🌐 {t('Language')}</p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {LANGS.map(L => (
+              <button key={L.code} onClick={() => changeLang(L.code)}
+                style={{ flex: 1, padding: '12px 0', borderRadius: 12, border: '1.5px solid ' + (lang === L.code ? Y : '#2a2a2a'),
+                  background: lang === L.code ? YL : '#111', color: lang === L.code ? BK : '#888',
+                  fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                {L.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* ── Profile Section ── */}
         {section === 'profile' && (

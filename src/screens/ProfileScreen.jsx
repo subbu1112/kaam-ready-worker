@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { sb } from '../lib/supabase'
 import AvatarUpload from '../components/AvatarUpload'
+import { loadSettings, SETTINGS_DEFAULTS } from '../lib/settings'
+import { getLang, setLang, LANGS, t } from '../i18n'
 
 const Y='#F5C000', YD='#B8900A', YL='#FFF8D6', BK='#1C1C1E', GREEN='#22c55e'
 
@@ -28,9 +30,35 @@ function Field({ label, value, onChange, type='text', placeholder='' }) {
   )
 }
 
-export default function ProfileScreen({ user, profile, showToast, reloadProfile }) {
+export default function ProfileScreen({ user, profile, showToast, reloadProfile, setTab }) {
   const [modal,       setModal]       = useState(null)
   const [signingOut,  setSigningOut]  = useState(false)
+  const [ratings,        setRatings]        = useState([])
+  const [ratingsLoading, setRatingsLoading] = useState(false)
+  const [cfg, setCfg] = useState(SETTINGS_DEFAULTS)
+  const [lang, setLangState] = useState(getLang())
+
+  function changeLang(code) {
+    setLang(code); setLangState(code)
+    showToast('Language updated')
+    setTimeout(() => window.location.reload(), 400)
+  }
+
+  useEffect(() => { loadSettings().then(setCfg) }, [])
+  const supTel = (cfg.support_phone || '18005747435').replace(/\D/g,'')
+  const supWa  = (cfg.support_whatsapp || '918012345678').replace(/\D/g,'')
+  const supMail= cfg.support_email || 'support@kaamready.in'
+
+  async function loadRatings() {
+    setRatingsLoading(true)
+    const { data } = await sb.from('bookings')
+      .select('rating,review,customer_name,service,completed_at,created_at')
+      .eq('worker_id', user.id)
+      .not('rating', 'is', null)
+      .order('completed_at', { ascending: false, nullsFirst: false })
+    setRatings(data || [])
+    setRatingsLoading(false)
+  }
 
   // Contact modal state
   const [contEmail,    setContEmail]    = useState(profile?.email || '')
@@ -47,11 +75,18 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile 
   const [kycSaving,     setKycSaving]     = useState(false)
 
   // Bank modal state
-  const [upiId,      setUpiId]      = useState(profile?.upi_id || '')
-  const [bankAcc,    setBankAcc]    = useState(profile?.bank_account || '')
-  const [bankIfsc,   setBankIfsc]   = useState(profile?.bank_ifsc || '')
-  const [bankName,   setBankName]   = useState(profile?.bank_name || '')
-  const [bankSaving, setBankSaving] = useState(false)
+  const [upiId,        setUpiId]        = useState(profile?.upi_id || '')
+  const [bankAcc,      setBankAcc]      = useState(profile?.bank_account || '')
+  const [bankIfsc,     setBankIfsc]     = useState(profile?.bank_ifsc || '')
+  const [bankName,     setBankName]     = useState(profile?.bank_name || '')
+  const [payoutMethod, setPayoutMethod] = useState(profile?.payout_method || 'upi')
+  const [bankSaving,   setBankSaving]   = useState(false)
+
+  const PAYOUT_OPTIONS = [
+    { code:'upi',  ico:'📱', label:'UPI' },
+    { code:'bank', ico:'🏦', label:'Bank Transfer' },
+    { code:'cash', ico:'💵', label:'Cash' },
+  ]
 
   async function saveContact() {
     setContSaving(true)
@@ -99,9 +134,11 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile 
   }
 
   async function saveBank() {
-    if (!upiId.includes('@')) { showToast('Enter valid UPI ID'); return }
+    if (payoutMethod === 'upi' && !upiId.includes('@')) { showToast('Enter valid UPI ID'); return }
+    if (payoutMethod === 'bank' && (!bankAcc.trim() || !bankIfsc.trim())) { showToast('Enter bank account & IFSC'); return }
     setBankSaving(true)
     const { error } = await sb.from('workers').update({
+      payout_method: payoutMethod,
       upi_id: upiId.trim(),
       bank_account: bankAcc.trim() || null,
       bank_ifsc: bankIfsc.trim() || null,
@@ -119,16 +156,20 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile 
   }
 
   const menus = [
+    { ico:'👛', label:'Wallet & Withdrawals', bg:'#1a1a1a', action:() => setTab && setTab('wallet') },
+    { ico:'🔔', label:'Notifications',      bg:'#1a1a1a', action:() => setTab && setTab('notifications') },
+    { ico:'🏆', label:'Rewards & Tiers',    bg:'#2d1a00', action:() => setTab && setTab('rewards') },
     { ico:'📞', label:'Contact Info',      bg:'#1a3a1a', action:() => setModal('contact') },
     { ico:'🛡️', label:'KYC Documents',     bg:'#1a1a3a', action:() => setModal('kyc') },
     { ico:'💳', label:'Payment & Bank',    bg:'#1a1a1a', action:() => setModal('bank') },
-    { ico:'🏆', label:'Achievements',      bg:'#2d1a00', action:() => showToast('Coming soon!') },
-    { ico:'⭐', label:'My Ratings',        bg:'#2d1a00', action:() => showToast('Coming soon!') },
-    { ico:'❓', label:'Help & Support',    bg:'#1a1a1a', action:() => showToast('Call us: 1800-XXX-XXXX') },
+    { ico:'⚙️', label:'Settings',          bg:'#1a1a1a', action:() => setTab && setTab('settings') },
+    { ico:'⭐', label:'My Ratings',        bg:'#2d1a00', action:() => { setModal('ratings'); loadRatings() } },
+    { ico:'❓', label:'Help & Support',    bg:'#1a1a1a', action:() => setModal('help') },
   ]
 
   return (
-    <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:12 }}>
+    <div style={{ flex:1, minHeight:0, position:'relative' }}>
+    <div style={{ position:'absolute', inset:0, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:16, display:'flex', flexDirection:'column', gap:12 }}>
 
       {/* Contact Modal */}
       {modal === 'contact' && (
@@ -181,16 +222,138 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile 
       {/* Bank Modal */}
       {modal === 'bank' && (
         <Modal title="💳 Payment & Bank Info" onClose={() => setModal(null)}>
-          <Field label="UPI ID *" value={upiId} onChange={setUpiId} placeholder="yourname@upi" />
-          <Field label="Bank Account Number" value={bankAcc} onChange={setBankAcc} placeholder="XXXXXXXXXX" />
-          <Field label="IFSC Code" value={bankIfsc} onChange={v => setBankIfsc(v.toUpperCase())} placeholder="HDFC0001234" />
-          <Field label="Bank Name" value={bankName} onChange={setBankName} placeholder="HDFC Bank" />
+          <label style={{ fontSize:11, fontWeight:700, color:'#636366', display:'block', marginBottom:8, textTransform:'uppercase', letterSpacing:.5 }}>Preferred Payout Method *</label>
+          <div style={{ display:'flex', gap:8, marginBottom:18 }}>
+            {PAYOUT_OPTIONS.map(o => (
+              <button key={o.code} onClick={() => setPayoutMethod(o.code)}
+                style={{ flex:1, padding:'12px 4px', borderRadius:12, border:'1.5px solid '+(payoutMethod===o.code?Y:'#2a2a2a'),
+                  background:payoutMethod===o.code?YL:'#111', color:payoutMethod===o.code?BK:'#888',
+                  fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                <span style={{ fontSize:20 }}>{o.ico}</span>{o.label}
+              </button>
+            ))}
+          </div>
+
+          {payoutMethod === 'upi' && (
+            <Field label="UPI ID *" value={upiId} onChange={setUpiId} placeholder="yourname@upi" />
+          )}
+          {payoutMethod === 'bank' && (<>
+            <Field label="Bank Account Number *" value={bankAcc} onChange={setBankAcc} placeholder="XXXXXXXXXX" />
+            <Field label="IFSC Code *" value={bankIfsc} onChange={v => setBankIfsc(v.toUpperCase())} placeholder="HDFC0001234" />
+            <Field label="Bank Name" value={bankName} onChange={setBankName} placeholder="HDFC Bank" />
+          </>)}
+          {payoutMethod === 'cash' && (
+            <p style={{ color:'#999', fontSize:13, background:'#111', border:'1px solid #2a2a2a', borderRadius:12, padding:'12px 14px', marginBottom:14 }}>
+              💵 You'll collect your earnings in cash. No bank details needed.
+            </p>
+          )}
+
           <button onClick={saveBank} disabled={bankSaving}
             style={{ width:'100%', background:Y, border:'none', borderRadius:14, padding:15, fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'inherit', opacity:bankSaving?0.6:1 }}>
             {bankSaving ? 'Saving...' : 'Save Payment Info ✓'}
           </button>
         </Modal>
       )}
+
+      {/* Help & Support Modal */}
+      {modal === 'help' && (
+        <Modal title="❓ Help & Support" onClose={() => setModal(null)}>
+          <p style={{ color:'#999', fontSize:13, marginBottom:16 }}>Our team is available 8 AM – 10 PM, 7 days a week.</p>
+          {[
+            ['📞', 'Call Support', supTel, 'tel:' + supTel],
+            ['💬', 'WhatsApp', 'Chat with our team', 'https://wa.me/' + supWa + '?text=Hi+Kaam+Ready+Worker+Support'],
+            ['📧', 'Email', supMail, 'mailto:' + supMail],
+          ].map(([ico, label, sub, href]) => (
+            <a key={label} href={href} target="_blank" rel="noopener noreferrer"
+              style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'#111', borderRadius:12, marginBottom:10, border:'1px solid #2a2a2a', textDecoration:'none' }}>
+              <div style={{ width:40, height:40, borderRadius:12, background:'#2a2a2a', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>{ico}</div>
+              <div style={{ flex:1 }}>
+                <p style={{ fontWeight:700, fontSize:14, color:'#fff' }}>{label}</p>
+                <p style={{ fontSize:12, color:'#777', marginTop:2 }}>{sub}</p>
+              </div>
+              <span style={{ color:'#444', fontSize:18 }}>›</span>
+            </a>
+          ))}
+        </Modal>
+      )}
+
+      {/* My Ratings Modal */}
+      {modal === 'ratings' && (() => {
+        const count = ratings.length
+        const avg = count ? (ratings.reduce((a,r)=>a+(r.rating||0),0)/count) : (profile?.rating || 0)
+        const dist = [5,4,3,2,1].map(s => ({ s, n: ratings.filter(r=>Math.round(r.rating)===s).length }))
+        return (
+          <Modal title="⭐ My Ratings" onClose={() => setModal(null)}>
+            <div style={{ textAlign:'center', marginBottom:16 }}>
+              <p style={{ fontSize:42, fontWeight:900, color:Y, lineHeight:1 }}>{avg.toFixed(1)}</p>
+              <p style={{ fontSize:18, color:Y }}>{'★'.repeat(Math.round(avg))}{'☆'.repeat(5-Math.round(avg))}</p>
+              <p style={{ fontSize:12, color:'#777', marginTop:4 }}>{count} rating{count!==1?'s':''} from customers</p>
+            </div>
+            <div style={{ marginBottom:16 }}>
+              {dist.map(({s,n}) => (
+                <div key={s} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:5 }}>
+                  <span style={{ fontSize:12, color:'#aaa', width:28 }}>{s}★</span>
+                  <div style={{ flex:1, height:8, background:'#2a2a2a', borderRadius:4, overflow:'hidden' }}>
+                    <div style={{ width:(count? (n/count*100):0)+'%', height:'100%', background:Y }} />
+                  </div>
+                  <span style={{ fontSize:12, color:'#777', width:24, textAlign:'right' }}>{n}</span>
+                </div>
+              ))}
+            </div>
+            <p style={{ color:Y, fontWeight:700, fontSize:13, marginBottom:10 }}>Recent Reviews</p>
+            {ratingsLoading ? (
+              <p style={{ color:'#777', fontSize:13, textAlign:'center', padding:20 }}>Loading…</p>
+            ) : ratings.length === 0 ? (
+              <p style={{ color:'#777', fontSize:13, textAlign:'center', padding:20 }}>No ratings yet. Complete jobs to earn reviews ⭐</p>
+            ) : ratings.map((r,i) => (
+              <div key={i} style={{ background:'#111', borderRadius:12, padding:'12px 14px', marginBottom:8, border:'1px solid #2a2a2a' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span style={{ color:Y, fontSize:13 }}>{'★'.repeat(Math.round(r.rating))}{'☆'.repeat(5-Math.round(r.rating))}</span>
+                  <span style={{ fontSize:11, color:'#555' }}>{r.completed_at || r.created_at ? new Date(r.completed_at||r.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) : ''}</span>
+                </div>
+                {r.review && <p style={{ color:'#ccc', fontSize:13, marginTop:6 }}>"{r.review}"</p>}
+                <p style={{ color:'#555', fontSize:11, marginTop:6 }}>{r.customer_name || 'Customer'} · {r.service || ''}</p>
+              </div>
+            ))}
+          </Modal>
+        )
+      })()}
+
+      {/* Achievements Modal */}
+      {modal === 'achievements' && (() => {
+        const jobs = profile?.total_jobs || 0
+        const rating = profile?.rating || 0
+        const trust = profile?.trust_score ?? 100
+        const badges = [
+          { ico:'🎉', title:'First Job',      desc:'Complete your first job',        earned: jobs >= 1 },
+          { ico:'🔟', title:'10 Jobs',        desc:'Complete 10 jobs',              earned: jobs >= 10 },
+          { ico:'💪', title:'50 Jobs',        desc:'Complete 50 jobs',              earned: jobs >= 50 },
+          { ico:'🏆', title:'Century',        desc:'Complete 100 jobs',             earned: jobs >= 100 },
+          { ico:'⭐', title:'Top Rated',      desc:'Maintain a 4.5+ rating',        earned: rating >= 4.5 },
+          { ico:'🛡️', title:'KYC Verified',   desc:'Complete Aadhaar verification', earned: !!(profile?.aadhar_verified || profile?.aadhaar_verified) },
+          { ico:'🤝', title:'Trusted Pro',    desc:'Keep trust score above 90%',    earned: trust >= 90 },
+          { ico:'💳', title:'Payout Ready',   desc:'Add your UPI / bank details',   earned: !!profile?.upi_id },
+        ]
+        const earnedCount = badges.filter(b=>b.earned).length
+        return (
+          <Modal title="🏆 Achievements" onClose={() => setModal(null)}>
+            <div style={{ textAlign:'center', marginBottom:16 }}>
+              <p style={{ fontSize:32, fontWeight:900, color:Y }}>{earnedCount}/{badges.length}</p>
+              <p style={{ fontSize:12, color:'#777' }}>badges earned</p>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              {badges.map(b => (
+                <div key={b.title} style={{ background: b.earned ? '#2d2400' : '#141414', borderRadius:14, padding:'14px 12px', border:'1px solid '+(b.earned?Y:'#2a2a2a'), textAlign:'center', opacity:b.earned?1:0.55 }}>
+                  <div style={{ fontSize:30, marginBottom:6, filter: b.earned?'none':'grayscale(1)' }}>{b.ico}</div>
+                  <p style={{ fontSize:13, fontWeight:800, color: b.earned?Y:'#888' }}>{b.title}</p>
+                  <p style={{ fontSize:10, color:'#666', marginTop:3 }}>{b.desc}</p>
+                  {b.earned && <p style={{ fontSize:10, color:GREEN, marginTop:6, fontWeight:700 }}>✓ Earned</p>}
+                </div>
+              ))}
+            </div>
+          </Modal>
+        )
+      })()}
 
       {/* Profile Header */}
       <div style={{ background:'#1a1a1a', borderRadius:20, padding:20, border:'1px solid #2a2a2a', textAlign:'center' }}>
@@ -233,6 +396,21 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile 
         ))}
       </div>
 
+      {/* Language */}
+      <div style={{ background:'#1a1a1a', borderRadius:20, border:'1px solid #2a2a2a', padding:16 }}>
+        <p style={{ color:Y, fontWeight:800, fontSize:14, marginBottom:12 }}>🌐 {t('Language')}</p>
+        <div style={{ display:'flex', gap:8 }}>
+          {LANGS.map(L => (
+            <button key={L.code} onClick={() => changeLang(L.code)}
+              style={{ flex:1, padding:'12px 0', borderRadius:12, border:'1.5px solid '+(lang===L.code?Y:'#2a2a2a'),
+                background:lang===L.code?YL:'#111', color:lang===L.code?BK:'#888', fontWeight:700, fontSize:13,
+                cursor:'pointer', fontFamily:'inherit' }}>
+              {L.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Menu */}
       <div style={{ background:'#1a1a1a', borderRadius:20, border:'1px solid #2a2a2a', overflow:'hidden' }}>
         {menus.map(({ ico, label, bg, action }) => (
@@ -250,6 +428,7 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile 
         {signingOut ? 'Signing out...' : '🚪 Sign Out'}
       </button>
       <p style={{ textAlign:'center', fontSize:11, color:'#333', paddingBottom:8 }}>Kaam Ready v2.0 — Karnataka 🇮🇳</p>
+    </div>
     </div>
   )
 }

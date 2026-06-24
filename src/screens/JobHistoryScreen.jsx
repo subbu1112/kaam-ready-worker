@@ -63,7 +63,7 @@ export default function JobHistoryScreen({ user, onBack }) {
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ background: '#1a1a1a', borderRadius: 16, padding: 16, border: '1px solid #2a2a2a' }}>
             {[
               ['Customer', selected.customer_name || '—'],
@@ -153,7 +153,7 @@ export default function JobHistoryScreen({ user, onBack }) {
       </div>
 
       {/* List */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px 16px' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 16px 16px' }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: 40 }}>
             <p style={{ color: '#555' }}>Loading job history...</p>

@@ -1,18 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
 import { sb } from '../lib/supabase'
 import MapView from '../components/MapView'
-import { floorFor, COMMISSION } from '../constants'
+import { floorFor, COMMISSION, EMPTY_BREAKDOWN, breakdownTotal, workerShare } from '../constants'
 import { t } from '../i18n'
 const Y='#F5C000',YL='#FFF8D6',GREEN='#22c55e',RED='#ef4444'
-export default function HomeScreen({ user, profile, showToast }) {
+export default function HomeScreen({ user, profile, showToast, setTab }) {
   const [online,    setOnline]    = useState(() => localStorage.getItem('kr_worker_online') === 'true')
   const [jobAlert,  setJobAlert]  = useState(null)
   const [activeJob, setActiveJob] = useState(null)
   const [todayEarn, setTodayEarn] = useState(0)
   const [todayJobs, setTodayJobs] = useState(0)
-  const [showPrice, setShowPrice] = useState(false)
-  const [price,     setPrice]     = useState('')
-  const [note,      setNote]      = useState('')
+  const [otpOpen,   setOtpOpen]   = useState(false)   // customer-OTP entry panel open
+  const [otpInput,  setOtpInput]  = useState('')
+  const [bd,        setBd]        = useState(EMPTY_BREAKDOWN) // price breakdown: labor/material/additional/note
   const [busy,      setBusy]      = useState(false)
   const [upcoming,  setUpcoming]  = useState([])
   const [schedAvail,setSchedAvail]= useState([])
@@ -34,7 +34,7 @@ export default function HomeScreen({ user, profile, showToast }) {
   useEffect(() => {
     if (!user?.id) return
     sb.from('bookings').select('*').eq('worker_id', user.id)
-      .in('status', ['assigned','priced']).order('created_at', { ascending:false }).limit(3)
+      .in('status', ['assigned','otp_verified','priced']).order('created_at', { ascending:false }).limit(3)
       .then(({ data }) => {
         const j = (data||[]).find(b => !(b.is_scheduled && b.scheduled_at && new Date(b.scheduled_at) > new Date(Date.now()+15*60*1000)))
         if (j) setActiveJob(prev => prev || j)
@@ -88,8 +88,24 @@ export default function HomeScreen({ user, profile, showToast }) {
     return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
   }
 
+  // The worker's trade(s): primary skill + any extra skills (multi-skilled).
+  function mySkillIds() {
+    const set = new Set()
+    if (profile?.skill) set.add(profile.skill)
+    ;(profile?.skills || []).forEach(s => s && set.add(s))
+    return [...set]
+  }
+  // A job only matches if its service is one the worker is skilled in.
+  function matchesSkill(b) {
+    const ids = mySkillIds()
+    if (!ids.length) return true        // no skills on file → don't hard-block
+    if (!b?.service_id) return true     // legacy booking without service_id → allow
+    return ids.includes(b.service_id)
+  }
+
   function offerJob(b) {
     if (b.city !== profile?.city) return
+    if (!matchesSkill(b)) return        // electrician won't get plumber jobs, etc.
     let delay = 0
     if (b.preferred_worker_id && b.preferred_worker_id !== user.id) delay = 60000
     else if (b.preferred_worker_id === user.id) delay = 0
@@ -112,16 +128,21 @@ export default function HomeScreen({ user, profile, showToast }) {
     chan.current = sb.channel('new-jobs-'+profile?.city)
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'bookings',filter:'status=eq.searching'},payload=>offerJob(payload.new))
       .subscribe()
-    sb.from('bookings').select('*').eq('status','searching').eq('city', profile?.city)
+    const ids = mySkillIds()
+    let q = sb.from('bookings').select('*').eq('status','searching').eq('city', profile?.city)
       .gte('created_at', new Date(Date.now()-3*60*1000).toISOString())
       .order('created_at',{ascending:false}).limit(1)
-      .then(({ data }) => { if (data?.[0]) offerJob(data[0]) })
+    if (ids.length) q = q.in('service_id', ids)
+    q.then(({ data }) => { if (data?.[0]) offerJob(data[0]) })
     loadScheduled()
   }
 
   async function loadScheduled() {
+    const ids = mySkillIds()
+    let availQ = sb.from('bookings').select('*').eq('status','scheduled').is('worker_id', null).eq('city', profile?.city).gte('scheduled_at', new Date().toISOString()).order('scheduled_at').limit(5)
+    if (ids.length) availQ = availQ.in('service_id', ids)
     const [avail, mine] = await Promise.all([
-      sb.from('bookings').select('*').eq('status','scheduled').is('worker_id', null).eq('city', profile?.city).gte('scheduled_at', new Date().toISOString()).order('scheduled_at').limit(5),
+      availQ,
       sb.from('bookings').select('*').eq('worker_id', user.id).eq('is_scheduled', true).eq('status','assigned').gte('scheduled_at', new Date(Date.now()-30*60*1000).toISOString()).order('scheduled_at').limit(5),
     ])
     setSchedAvail(avail.data || [])
@@ -180,20 +201,51 @@ export default function HomeScreen({ user, profile, showToast }) {
 
   function jobFloor(job) { return floorFor(job?.service_id) }
 
-  async function submitPrice() {
-    if(!activeJob || busy) return
-    const p = parseInt(price, 10)
+  // STEP 1 — Customer OTP verification. The customer reads a 4-digit code from
+  // their app; the worker enters it here. Only on a match is the job marked
+  // complete and the price-setting form unlocked.
+  async function verifyOtp() {
+    if (!activeJob || busy) return
+    const entered = otpInput.replace(/\D/g, '').trim()
+    if (entered.length < 4) { showToast('Enter the 4-digit code the customer shows you'); return }
+    setBusy(true)
+    const { data } = await sb.from('bookings').select('completion_otp').eq('id', activeJob.id).single()
+    setBusy(false)
+    const real = (data?.completion_otp ?? '').toString().trim()
+    if (!real) { showToast('No OTP on file — ask the customer to refresh their app'); return }
+    if (entered !== real) { showToast('OTP does not match. Re-check with the customer.'); return }
+    const ts = new Date().toISOString()
+    const { error } = await sb.from('bookings').update({ status:'otp_verified', otp_verified_at: ts }).eq('id', activeJob.id)
+    if (error) { showToast(error.message); return }
+    setActiveJob(prev => ({ ...prev, status:'otp_verified', otp_verified_at: ts }))
+    setOtpOpen(false); setOtpInput('')
+    showToast('OTP verified ✓ Job complete — now set your final price')
+  }
+
+  // STEP 2 — Detailed price quotation. Worker enters labour + material +
+  // additional charges; total must respect the category floor. Sent to the
+  // customer to Accept / Modify before paying.
+  async function submitQuote() {
+    if (!activeJob || busy) return
+    const labor = parseInt(bd.labor, 10) || 0
+    const total = breakdownTotal(bd)
     const floor = jobFloor(activeJob)
-    if (!p || p < floor) { showToast(`Price can't be below the ₹${floor} minimum`); return }
+    if (!labor) { showToast('Enter the labour charge'); return }
+    if (total < floor) { showToast(`Total can't be below the ₹${floor} minimum`); return }
     setBusy(true)
     const { error } = await sb.from('bookings').update({
-      status:'priced', amount:p, price_note:note.trim()||null, priced_at:new Date().toISOString(),
+      status:'priced', amount: total,
+      labor_charge: labor,
+      material_cost: parseInt(bd.material, 10) || 0,
+      additional_charge: parseInt(bd.additional, 10) || 0,
+      price_note: bd.note.trim() || null,
+      priced_at: new Date().toISOString(),
     }).eq('id', activeJob.id)
     setBusy(false)
     if (error) { showToast(error.message); return }
-    setActiveJob(prev => ({ ...prev, status:'priced', amount:p, price_note:note.trim()||null }))
-    setShowPrice(false)
-    showToast('Price sent — waiting for customer to pay via UPI to KaamReady 💳')
+    setActiveJob(prev => ({ ...prev, status:'priced', amount: total }))
+    setBd(EMPTY_BREAKDOWN)
+    showToast('Quotation sent — waiting for customer to accept & pay 💳')
   }
 
   function toggleOnline() { const next=!online; setOnline(next); showToast(next?'You are now Online 🟢':'You are now Offline') }
@@ -207,7 +259,7 @@ export default function HomeScreen({ user, profile, showToast }) {
       <div style={{ background:online?GREEN:'#1C1C1E', padding:'10px 20px 6px', display:'flex', justifyContent:'space-between', transition:'background .3s' }}>
         <span style={{ color:'#fff', fontSize:12, fontWeight:700 }}>Kaam Ready</span>
         <span style={{ color:'#fff', fontSize:11, fontWeight:800 }}>{online?'● '+t('ONLINE'):'● '+t('OFFLINE')}</span>
-        <span style={{ color:'#fff', fontSize:12 }}>📶 🔋</span>
+        <span onClick={() => setTab && setTab('notifications')} style={{ color:'#fff', fontSize:14, cursor:'pointer' }}>🔔</span>
       </div>
       <div style={{ background:'#1C1C1E', padding:'10px 20px 16px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
         <div>
@@ -219,12 +271,12 @@ export default function HomeScreen({ user, profile, showToast }) {
         </div>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:12 }}>
+      <div style={{ flex:1, minHeight:0, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:12 }}>
         {!online && !activeJob && (
           <div style={{ background:'#111', borderRadius:20, padding:'28px 24px', textAlign:'center', border:'1.5px dashed #2a2a2a' }}>
             <div style={{ fontSize:44, marginBottom:12 }}>😴</div>
             <p style={{ fontWeight:800, fontSize:16, color:'#fff' }}>{t('You are Offline')}</p>
-            <p style={{ fontSize:13, color:'#555', margin:'6px 0 18px' }}>Toggle the switch above to start receiving jobs</p>
+            <p style={{ fontSize:13, color:'#555', margin:'6px 0 18px' }}>{t('Toggle the switch above to start receiving jobs')}</p>
             <button onClick={toggleOnline} style={{ background:Y, border:'none', borderRadius:14, padding:'14px 28px', fontWeight:800, fontSize:14, cursor:'pointer' }}>{t('Go Online Now')}</button>
           </div>
         )}
@@ -232,7 +284,7 @@ export default function HomeScreen({ user, profile, showToast }) {
           <div style={{ background:'#111', border:'1.5px solid '+Y, borderRadius:20, padding:'28px 24px', textAlign:'center' }}>
             <div style={{ fontSize:44, marginBottom:12 }}>🟢</div>
             <p style={{ fontWeight:800, fontSize:16, color:'#fff' }}>{t('Waiting for jobs...')}</p>
-            <p style={{ fontSize:13, color:'#636366', marginTop:6 }}>You'll be notified instantly when a job matches</p>
+            <p style={{ fontSize:13, color:'#636366', marginTop:6 }}>{t("You'll be notified instantly when a job matches")}</p>
           </div>
         )}
         {online && upcoming.length>0 && (
@@ -291,7 +343,7 @@ export default function HomeScreen({ user, profile, showToast }) {
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
               <p style={{ fontWeight:800, fontSize:14, color:'#fff' }}>🔧 {t('Active Job')}</p>
               <span style={{ background: activeJob.payment_status==='verified' ? '#D1FAE5' : activeJob.payment_status==='pending_verification' ? '#E0F2FE' : '#2a2a2a', color: activeJob.payment_status==='verified' ? '#065F46' : activeJob.payment_status==='pending_verification' ? '#0369A1' : '#636366', fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:8 }}>
-                {activeJob.payment_status==='verified' ? '✅ Verified' : activeJob.payment_status==='pending_verification' ? '🔍 Under Review' : activeJob.status==='priced' ? t('Awaiting Payment') : t('In Progress')}
+                {activeJob.payment_status==='verified' ? '✅ Verified' : activeJob.payment_status==='pending_verification' ? '🔍 Under Review' : activeJob.status==='priced' ? t('Awaiting Payment') : activeJob.status==='otp_verified' ? '✅ Completed' : t('In Progress')}
               </span>
             </div>
             {bookingRef && <p style={{ color:'#636366', fontSize:11, fontFamily:'monospace', marginBottom:10 }}>{bookingRef}</p>}
@@ -326,22 +378,51 @@ export default function HomeScreen({ user, profile, showToast }) {
                 ))}
               </div>
             )}
-            {/* Set price button — only when no payment_status yet */}
-            {activeJob.status!=='priced' && !paymentStarted(activeJob.payment_status) && !showPrice && (
-              <button onClick={() => { setPrice(''); setNote(''); setShowPrice(true) }} style={{ width:'100%', background:GREEN, color:'#fff', border:'none', borderRadius:14, padding:15, fontWeight:800, fontSize:14, cursor:'pointer', marginTop:10 }}>{t('Work Done — Set Final Price ₹')}</button>
+            {/* STEP 1 — Work done → verify customer OTP (gates completion) */}
+            {activeJob.status!=='priced' && !paymentStarted(activeJob.payment_status) && !activeJob.otp_verified_at && !otpOpen && (
+              <button onClick={() => { setOtpInput(''); setOtpOpen(true) }} style={{ width:'100%', background:GREEN, color:'#fff', border:'none', borderRadius:14, padding:15, fontWeight:800, fontSize:14, cursor:'pointer', marginTop:10 }}>✅ Work Done — Verify Customer OTP</button>
             )}
-            {activeJob.status!=='priced' && !paymentStarted(activeJob.payment_status) && showPrice && (
+            {activeJob.status!=='priced' && !paymentStarted(activeJob.payment_status) && !activeJob.otp_verified_at && otpOpen && (
               <div style={{ background:'#1C1C1E', borderRadius:14, padding:14, marginTop:10 }}>
-                <p style={{ color:Y, fontWeight:800, fontSize:13, marginBottom:4 }}>Final Price</p>
-                <p style={{ color:'#636366', fontSize:11, marginBottom:10 }}>Minimum: ₹{jobFloor(activeJob)} — price fairly, customer approves before paying</p>
-                <input value={price} onChange={e => setPrice(e.target.value.replace(/\D/g,'').slice(0,5))} type="tel" placeholder="₹ amount"
-                  style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:12, fontSize:15, fontWeight:700, color:'#fff', outline:'none', fontFamily:'inherit', marginBottom:8 }} />
-                <input value={note} onChange={e => setNote(e.target.value.slice(0,120))} placeholder="Why this price? e.g. extra wiring replaced"
-                  style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:12, fontSize:13, color:'#fff', outline:'none', fontFamily:'inherit', marginBottom:10 }} />
+                <p style={{ color:Y, fontWeight:800, fontSize:13, marginBottom:4 }}>🔐 Customer Verification</p>
+                <p style={{ color:'#636366', fontSize:11, marginBottom:10 }}>Ask the customer for the 4-digit code in their app, then enter it to confirm the job is done.</p>
+                <input value={otpInput} onChange={e => setOtpInput(e.target.value.replace(/\D/g,'').slice(0,6))} type="tel" inputMode="numeric" placeholder="• • • •"
+                  style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:12, fontSize:22, fontWeight:800, letterSpacing:8, textAlign:'center', color:'#fff', outline:'none', fontFamily:'inherit', marginBottom:10, boxSizing:'border-box' }} />
                 <div style={{ display:'flex', gap:8 }}>
-                  <button onClick={() => setShowPrice(false)} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:10, padding:12, fontWeight:700, fontSize:13, cursor:'pointer' }}>Cancel</button>
-                  <button onClick={submitPrice} disabled={busy} style={{ flex:2, background:Y, border:'none', borderRadius:10, padding:12, fontWeight:800, fontSize:13, cursor:'pointer', opacity:busy?0.6:1 }}>{busy?'...':t('Send to Customer →')}</button>
+                  <button onClick={() => { setOtpOpen(false); setOtpInput('') }} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:10, padding:12, fontWeight:700, fontSize:13, cursor:'pointer' }}>{t('Cancel')}</button>
+                  <button onClick={verifyOtp} disabled={busy} style={{ flex:2, background:GREEN, color:'#fff', border:'none', borderRadius:10, padding:12, fontWeight:800, fontSize:13, cursor:'pointer', opacity:busy?0.6:1 }}>{busy?'...':'Verify & Complete ✓'}</button>
                 </div>
+              </div>
+            )}
+            {/* STEP 2 — OTP verified → detailed price breakdown quotation */}
+            {activeJob.status!=='priced' && !paymentStarted(activeJob.payment_status) && activeJob.otp_verified_at && (
+              <div style={{ background:'#1C1C1E', borderRadius:14, padding:14, marginTop:10 }}>
+                <p style={{ color:Y, fontWeight:800, fontSize:13, marginBottom:2 }}>🧾 Final Quotation</p>
+                <p style={{ color:'#636366', fontSize:11, marginBottom:12 }}>Minimum total: ₹{jobFloor(activeJob)} · 10% platform fee applies on payment</p>
+                {[
+                  ['labor',      'Labour charge ₹ *',  'e.g. 400'],
+                  ['material',   'Material cost ₹',    'e.g. 250 (optional)'],
+                  ['additional', 'Additional charges ₹','e.g. 100 (optional)'],
+                ].map(([key, label, ph]) => (
+                  <div key={key} style={{ marginBottom:8 }}>
+                    <label style={{ fontSize:10, fontWeight:700, color:'#636366', display:'block', marginBottom:4, textTransform:'uppercase', letterSpacing:.4 }}>{label}</label>
+                    <input value={bd[key]} onChange={e => setBd(prev => ({ ...prev, [key]: e.target.value.replace(/\D/g,'').slice(0,6) }))} type="tel" inputMode="numeric" placeholder={ph}
+                      style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:11, fontSize:14, fontWeight:700, color:'#fff', outline:'none', fontFamily:'inherit', boxSizing:'border-box' }} />
+                  </div>
+                ))}
+                <textarea value={bd.note} onChange={e => setBd(prev => ({ ...prev, note: e.target.value.slice(0,160) }))} placeholder="Work notes — what you did, parts replaced, etc."
+                  rows={2} style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:11, fontSize:13, color:'#fff', outline:'none', fontFamily:'inherit', boxSizing:'border-box', resize:'none', marginBottom:10 }} />
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background:'#111', borderRadius:10, padding:'10px 14px', marginBottom:10 }}>
+                  <div>
+                    <p style={{ color:'#636366', fontSize:11 }}>Total to customer</p>
+                    <p style={{ color:Y, fontSize:22, fontWeight:900 }}>₹{breakdownTotal(bd).toLocaleString('en-IN')}</p>
+                  </div>
+                  <div style={{ textAlign:'right' }}>
+                    <p style={{ color:'#636366', fontSize:11 }}>You earn (90%)</p>
+                    <p style={{ color:GREEN, fontSize:16, fontWeight:800 }}>₹{workerShare(breakdownTotal(bd)).toLocaleString('en-IN')}</p>
+                  </div>
+                </div>
+                <button onClick={submitQuote} disabled={busy} style={{ width:'100%', background:Y, border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer', opacity:busy?0.6:1, fontFamily:'inherit' }}>{busy?'...':'Send Quotation to Customer →'}</button>
               </div>
             )}
             {/* Awaiting payment — price sent, customer hasn't paid yet */}
@@ -364,9 +445,9 @@ export default function HomeScreen({ user, profile, showToast }) {
             {activeJob.payment_status==='verified' && (
               <div style={{ background:'#0d2818', border:'1px solid '+GREEN, borderRadius:14, padding:16, marginTop:10, textAlign:'center' }}>
                 <div style={{ fontSize:30, marginBottom:8 }}>✅</div>
-                <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>Payment verified!</p>
+                <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>{t('Payment verified!')}</p>
                 <p style={{ color:'#4ade80', fontSize:13, marginTop:4 }}>₹{Math.round((activeJob.amount||0)*0.9)} credited to your wallet 💰</p>
-                <button onClick={() => { setActiveJob(null); setPrice(''); setNote('') }}
+                <button onClick={() => { setActiveJob(null); setBd(EMPTY_BREAKDOWN); setOtpInput(''); setOtpOpen(false) }}
                   style={{ marginTop:12, background:GREEN, color:'#fff', border:'none', borderRadius:10, padding:'10px 20px', fontWeight:800, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
                   Done ✓
                 </button>
