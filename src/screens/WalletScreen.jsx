@@ -49,20 +49,24 @@ export default function WalletScreen({ user, profile, showToast, reloadProfile }
 
   async function requestWithdrawal() {
     const amt = parseInt(amount, 10) || 0
+    // Pending requests "reserve" funds. We never write wallet_balance from the
+    // worker app — a DB trigger blocks that, and the admin deducts on payout.
+    const pendingNow = withdraws
+      .filter(w => w.status === 'requested' || w.status === 'pending')
+      .reduce((s, w) => s + (Number(w.amount) || 0), 0)
+    const available = balance - pendingNow
     if (amt < MIN_WITHDRAW) { showToast(`Minimum withdrawal is ${fmt(MIN_WITHDRAW)}`); return }
-    if (amt > balance)      { showToast('Amount exceeds your wallet balance'); return }
+    if (amt > available)    { showToast(`Only ${fmt(available)} available after pending requests`); return }
     if (!upi.includes('@')) { showToast('Enter a valid UPI ID (e.g. name@upi)'); return }
     setBusy(true)
     const { error } = await sb.from('withdrawals').insert({
       worker_id: user.id, amount: amt, upi_id: upi.trim(), status: 'requested',
     })
     setBusy(false)
-    if (error) { showToast('Could not submit — run the latest DB migration first'); return }
-    // Optimistically hold the balance so workers don't double-request
-    await sb.from('workers').update({ wallet_balance: balance - amt }).eq('id', user.id)
+    if (error) { showToast('Could not submit — please try again'); return }
     showToast('Withdrawal requested ✓ Admin will process it shortly')
     setShowForm(false); setAmount('')
-    reloadProfile?.(); load()
+    load()
   }
 
   const pendingWithdraw = withdraws.filter(w => w.status === 'requested' || w.status === 'pending')
@@ -95,10 +99,10 @@ export default function WalletScreen({ user, profile, showToast, reloadProfile }
 
         {/* Balance card */}
         <div style={{ background:`linear-gradient(135deg, ${Y} 0%, #B8900A 100%)`, borderRadius:20, padding:'22px 20px', color:'#1a1a1a' }}>
-          <p style={{ fontSize:12, fontWeight:700, opacity:.7 }}>Withdrawable Balance</p>
-          <p style={{ fontSize:38, fontWeight:900, lineHeight:1.1, marginTop:4 }}>{fmt(balance)}</p>
+          <p style={{ fontSize:12, fontWeight:700, opacity:.7 }}>Available to Withdraw</p>
+          <p style={{ fontSize:38, fontWeight:900, lineHeight:1.1, marginTop:4 }}>{fmt(balance - pendingWithdraw)}</p>
           {pendingWithdraw > 0 && (
-            <p style={{ fontSize:12, fontWeight:600, marginTop:6, opacity:.75 }}>⏳ {fmt(pendingWithdraw)} withdrawal in progress</p>
+            <p style={{ fontSize:12, fontWeight:600, marginTop:6, opacity:.75 }}>⏳ {fmt(pendingWithdraw)} withdrawal in progress · wallet {fmt(balance)}</p>
           )}
           <button onClick={() => setShowForm(v => !v)}
             style={{ marginTop:16, width:'100%', background:'#1a1a1a', color:Y, border:'none', borderRadius:14, padding:14, fontWeight:800, fontSize:15, cursor:'pointer', fontFamily:'inherit' }}>
@@ -117,10 +121,10 @@ export default function WalletScreen({ user, profile, showToast, reloadProfile }
             <input value={upi} onChange={e => setUpi(e.target.value.trim())} placeholder="yourname@upi"
               style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:12, fontSize:14, color:'#fff', outline:'none', fontFamily:'inherit', boxSizing:'border-box', marginBottom:6 }} />
             <div style={{ display:'flex', gap:6, marginBottom:12 }}>
-              {[balance, 500, 1000].filter(v => v >= MIN_WITHDRAW && v <= balance).map(v => (
+              {[balance - pendingWithdraw, 500, 1000].filter(v => v >= MIN_WITHDRAW && v <= (balance - pendingWithdraw)).map(v => (
                 <button key={v} onClick={() => setAmount(String(Math.floor(v)))}
                   style={{ flex:1, background:'#111', color:'#aaa', border:'1px solid #2a2a2a', borderRadius:8, padding:'7px 0', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-                  {v === balance ? 'All' : fmt(v)}
+                  {v === (balance - pendingWithdraw) ? 'All' : fmt(v)}
                 </button>
               ))}
             </div>

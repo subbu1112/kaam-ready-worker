@@ -71,6 +71,38 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
     return () => { if (jobChan.current) sb.removeChannel(jobChan.current) }
   }, [activeJob?.id])
 
+  // Ring + vibrate for 3 seconds whenever a new job request arrives, so the
+  // worker notices even if the phone is in their pocket. Pure Web Audio (no
+  // asset needed); guarded so it can never crash the screen.
+  useEffect(() => {
+    if (!jobAlert?.id) return
+    let ctx, iv, to
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext
+      if (AC) {
+        ctx = new AC()
+        ctx.resume?.()
+        const beep = () => {
+          ;[1046, 1318].forEach((freq, i) => {           // two-tone "ding-dong"
+            const o = ctx.createOscillator(), g = ctx.createGain()
+            o.type = 'sine'; o.frequency.value = freq
+            o.connect(g); g.connect(ctx.destination)
+            const t = ctx.currentTime + i * 0.18
+            g.gain.setValueAtTime(0.0001, t)
+            g.gain.exponentialRampToValueAtTime(0.5, t + 0.02)
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16)
+            o.start(t); o.stop(t + 0.18)
+          })
+        }
+        beep()
+        iv = setInterval(beep, 700)
+      }
+      if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400])
+      to = setTimeout(() => { clearInterval(iv); ctx?.close?.() }, 3000)
+    } catch { /* audio unavailable — ignore */ }
+    return () => { clearInterval(iv); clearTimeout(to); try { ctx?.close?.() } catch {} }
+  }, [jobAlert?.id])
+
   async function loadTodayStats() {
     if(!user) return
     const today=new Date().toISOString().slice(0,10)
