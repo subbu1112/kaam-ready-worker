@@ -76,7 +76,12 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
   // asset needed); guarded so it can never crash the screen.
   useEffect(() => {
     if (!jobAlert?.id) return
-    let ctx, iv, to
+    let ctx, iv, to, closed = false
+    const closeCtx = () => {
+      if (closed || !ctx) return
+      closed = true
+      try { if (ctx.state !== 'closed') ctx.close() } catch { /* already closed */ }
+    }
     try {
       const AC = window.AudioContext || window.webkitAudioContext
       if (AC) {
@@ -98,9 +103,9 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
         iv = setInterval(beep, 700)
       }
       if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400])
-      to = setTimeout(() => { clearInterval(iv); ctx?.close?.() }, 3000)
+      to = setTimeout(() => { clearInterval(iv); closeCtx() }, 3000)
     } catch { /* audio unavailable — ignore */ }
-    return () => { clearInterval(iv); clearTimeout(to); try { ctx?.close?.() } catch {} }
+    return () => { clearInterval(iv); clearTimeout(to); closeCtx() }
   }, [jobAlert?.id])
 
   async function loadTodayStats() {
