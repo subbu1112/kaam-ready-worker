@@ -1,14 +1,25 @@
 {
+  "id": "/",
+  "scope": "/",
   "name": "Kaam Ready Worker",
   "short_name": "KR Worker",
-  "description": "Get jobs and earn with Kaam Ready",
+  "description": "Get nearby jobs, set your price, and earn with Kaam Ready. For verified skilled workers across Karnataka.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0A0A0A",
-  "theme_color": "#F5C000",
+  "theme_color": "#22c55e",
   "orientation": "portrait",
+  "lang": "en-IN",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Go online", "short_name": "Online", "url": "/", "description": "Start receiving jobs" },
+    { "name": "My earnings", "short_name": "Earnings", "url": "/", "description": "View your earnings" }
   ]
 }
