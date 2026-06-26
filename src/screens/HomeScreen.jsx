@@ -213,12 +213,25 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
   }
 
   async function acceptJob() {
-    if(!jobAlert) return
+    if(!jobAlert || busy) return
+    setBusy(true)
     const pos = await getPosition()
     if (pos) sb.from('workers').update({ lat: pos.lat, lng: pos.lng }).eq('id', user.id).then(()=>{})
     const w={id:user.id,name:profile?.name,skill:profile?.skill,rating:profile?.rating,jobs:profile?.total_jobs,ico:'👷',eta:'8 min',dist:'1.0 km',lat:pos?.lat,lng:pos?.lng}
-    await sb.from('bookings').update({status:'assigned',worker_id:user.id,worker:w}).eq('id',jobAlert.id)
-    setActiveJob({...jobAlert,status:'assigned',worker:w}); setJobAlert(null); showToast('Job accepted! Navigate to customer 🗺️')
+    // Atomic claim: only succeeds if still open AND this worker is allowed (RLS).
+    // .select() returns the row only if the write actually persisted — so we never
+    // show "accepted" locally while the database (and the customer) stay unchanged.
+    const { data, error } = await sb.from('bookings')
+      .update({ status:'assigned', worker_id:user.id, worker:w })
+      .eq('id', jobAlert.id).eq('status','searching').is('worker_id', null)
+      .select().single()
+    setBusy(false)
+    if (error || !data) {
+      setJobAlert(null)
+      showToast('Could not accept — it may already be taken, or your KYC isn\'t approved yet')
+      return
+    }
+    setActiveJob(data); setJobAlert(null); showToast('Job accepted! Navigate to customer 🗺️')
   }
 
   function navigateToCustomer() {
