@@ -14,13 +14,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      // Register the service worker immediately so it is reliably detected
-      // (e.g. by PWABuilder) and active early for offline + push.
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').catch(function () {});
-      }
-    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

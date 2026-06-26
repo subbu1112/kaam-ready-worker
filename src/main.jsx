@@ -21,8 +21,17 @@ Sentry.init({
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />)
 
-// Register the network-first service worker (always serves the freshest build,
-// caches only as an offline fallback, and enables web-push notifications).
+// Self-heal: unregister any previously-deployed custom service worker (/sw.js)
+// and clear its caches. A caching SW could break navigation for returning
+// visitors.
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}))
+  navigator.serviceWorker.getRegistrations()
+    .then((regs) => regs.forEach((r) => {
+      const url = (r.active && r.active.scriptURL) || ''
+      if (url.endsWith('/sw.js')) r.unregister()
+    }))
+    .catch(() => {})
+  if (window.caches) {
+    caches.keys().then((ks) => ks.forEach((k) => { if (k.startsWith('kr-') || k.startsWith('kaam-ready')) caches.delete(k) })).catch(() => {})
+  }
 }
