@@ -14,29 +14,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      // One-time self-heal: clear any stale service worker + caches from older builds, then reload.
-      (function () {
-        var V = 'kr-2026-06-24c';
-        try {
-          if (localStorage.getItem('kr_cache_ver') !== V) {
-            localStorage.setItem('kr_cache_ver', V);
-            var jobs = [];
-            if ('serviceWorker' in navigator) {
-              jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
-                return Promise.all(rs.map(function (r) { return r.unregister(); }));
-              }).catch(function () {}));
-            }
-            if (window.caches && caches.keys) {
-              jobs.push(caches.keys().then(function (ks) {
-                return Promise.all(ks.map(function (k) { return caches.delete(k); }));
-              }).catch(function () {}));
-            }
-            Promise.all(jobs).then(function () { location.reload(); });
-          }
-        } catch (e) {}
-      })();
-    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

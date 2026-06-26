@@ -21,9 +21,8 @@ Sentry.init({
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />)
 
-// No service worker: unregister any leftover SW so the app always loads fresh.
+// Register the network-first service worker (always serves the freshest build,
+// caches only as an offline fallback, and enables web-push notifications).
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations()
-    .then((rs) => rs.forEach((r) => r.unregister()))
-    .catch(() => {})
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}))
 }
