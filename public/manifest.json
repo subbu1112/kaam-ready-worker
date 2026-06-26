@@ -21,5 +21,10 @@
   "shortcuts": [
     { "name": "Go online", "short_name": "Online", "url": "/", "description": "Start receiving jobs" },
     { "name": "My earnings", "short_name": "Earnings", "url": "/", "description": "View your earnings" }
+  ],
+  "screenshots": [
+    { "src": "/ws-online.png", "sizes": "1080x2348", "type": "image/png", "form_factor": "narrow", "label": "Get verified jobs near you" },
+    { "src": "/ws-earn.png", "sizes": "1080x2348", "type": "image/png", "form_factor": "narrow", "label": "Withdraw earnings to UPI anytime" },
+    { "src": "/ws-tier.png", "sizes": "1080x2348", "type": "image/png", "form_factor": "narrow", "label": "Grow your tier and ratings" }
   ]
 }
