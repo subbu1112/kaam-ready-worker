@@ -4,6 +4,15 @@ import * as Sentry from '@sentry/react'
 import App from './App'
 import './index.css'
 
+// Swallow expected rejections from optional browser features (push prompts,
+// service-worker registration) so they don't surface as unhandled rejections.
+window.addEventListener('unhandledrejection', (e) => {
+  const msg = String((e.reason && (e.reason.message || e.reason)) || '')
+  if (msg === 'Rejected' || msg.toLowerCase().includes('serviceworker')) {
+    e.preventDefault()
+  }
+})
+
 // Auto-recover from stale lazy-loaded chunks after a new deploy.
 window.addEventListener('vite:preloadError', () => {
   if (!sessionStorage.getItem('kr_reloaded_stale')) {
