@@ -132,8 +132,12 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
     ;(profile?.skills || []).forEach(s => s && set.add(s))
     return [...set]
   }
-  // A job only matches if its service is one the worker is skilled in.
+  // Emergency jobs are urgent and broadcast to EVERY worker, regardless of trade.
+  const isEmergency = b => b?.service_id === 'emerg'
+  // A job only matches if its service is one the worker is skilled in —
+  // except emergencies, which are offered to all workers.
   function matchesSkill(b) {
+    if (isEmergency(b)) return true     // 🚨 emergency → reaches every worker
     const ids = mySkillIds()
     if (!ids.length) return true        // no skills on file → don't hard-block
     if (!b?.service_id) return true     // legacy booking without service_id → allow
@@ -144,7 +148,8 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
     if (b.city !== profile?.city) return
     if (!matchesSkill(b)) return        // electrician won't get plumber jobs, etc.
     let delay = 0
-    if (b.preferred_worker_id && b.preferred_worker_id !== user.id) delay = 60000
+    if (isEmergency(b)) delay = 0       // 🚨 emergency → alert every worker instantly
+    else if (b.preferred_worker_id && b.preferred_worker_id !== user.id) delay = 60000
     else if (b.preferred_worker_id === user.id) delay = 0
     else {
       const d = kmBetween(profile?.lat, profile?.lng, b.address_lat, b.address_lng)
@@ -169,7 +174,7 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
     let q = sb.from('bookings').select('*').eq('status','searching').eq('city', profile?.city)
       .gte('created_at', new Date(Date.now()-3*60*1000).toISOString())
       .order('created_at',{ascending:false}).limit(1)
-    if (ids.length) q = q.in('service_id', ids)
+    if (ids.length) q = q.in('service_id', [...new Set([...ids, 'emerg'])])  // emergencies reach everyone
     q.then(({ data }) => { if (data?.[0]) offerJob(data[0]) })
     loadScheduled()
   }
