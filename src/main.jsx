@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import * as Sentry from '@sentry/react'
+import OneSignal from 'react-onesignal'
 import App from './App'
 import './index.css'
 
@@ -60,6 +61,12 @@ Sentry.init({
     return event
   },
 })
+
+// Web push (OneSignal). The App ID is a public client identifier — safe to embed.
+OneSignal.init({
+  appId: '73690e24-f04e-4a04-b374-75943071f95c',
+  allowLocalhostAsSecureOrigin: true,
+}).catch(console.error)
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />)
 
