@@ -5,9 +5,9 @@ import { sb } from './supabase'
 export const SETTINGS_DEFAULTS = {
   commission_pct:   '10',
   upi_handle:       'kaamready@ybl',
-  support_phone:    '18005747435',
+  support_phone:    '6362869636',
   support_email:    'support@kaamready.in',
-  support_whatsapp: '918012345678',
+  support_whatsapp: '916362869636',
 }
 
 let cache = null

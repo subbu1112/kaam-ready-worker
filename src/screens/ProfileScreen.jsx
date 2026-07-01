@@ -45,8 +45,8 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
   }
 
   useEffect(() => { loadSettings().then(setCfg) }, [])
-  const supTel = (cfg.support_phone || '18005747435').replace(/\D/g,'')
-  const supWa  = (cfg.support_whatsapp || '918012345678').replace(/\D/g,'')
+  const supTel = '+916362869636'
+  const supWa  = '916362869636'
   const supMail= cfg.support_email || 'support@kaamready.in'
 
   async function loadRatings() {
