@@ -63,7 +63,9 @@ Sentry.init({
 })
 
 // Web push (OneSignal). The App ID is a public client identifier — safe to embed.
-OneSignal.init({
+// The init promise is exposed so App.jsx can wait for it before calling
+// OneSignal.login / addTags after the worker signs in.
+window.krPushReady = OneSignal.init({
   appId: '73690e24-f04e-4a04-b374-75943071f95c',
   allowLocalhostAsSecureOrigin: true,
 }).catch(console.error)

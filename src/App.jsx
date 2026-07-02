@@ -1,4 +1,5 @@
 import { useState, useEffect, lazy, Suspense, Component } from 'react'
+import OneSignal from 'react-onesignal'
 import { sb } from './lib/supabase'
 import TabBar  from './components/TabBar'
 import Toast   from './components/Toast'
@@ -15,6 +16,25 @@ const SettingsScreen   = lazy(() => import('./screens/SettingsScreen'))
 const WalletScreen        = lazy(() => import('./screens/WalletScreen'))
 const RewardsScreen       = lazy(() => import('./screens/RewardsScreen'))
 const NotificationsScreen = lazy(() => import('./screens/NotificationsScreen'))
+
+// Tie this device's push subscription to the worker's account and tag it with
+// city + skill, so booking alerts reach the right workers. Safe to call on
+// every login; failures are non-blocking.
+async function registerPush(uid, prof) {
+  try {
+    await (window.krPushReady || Promise.resolve())
+    await OneSignal.login(uid)
+    await OneSignal.User.addTags({
+      role:  'worker',
+      city:  prof?.city  || '',
+      skill: prof?.skill || '',
+    })
+    try { await OneSignal.Slidedown.promptPush() }
+    catch { try { await OneSignal.Notifications.requestPermission() } catch { /* denied */ } }
+  } catch (e) {
+    console.warn('Push setup skipped:', e?.message || e)
+  }
+}
 
 class TabErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
@@ -93,6 +113,7 @@ export default function App() {
       setProfile(data)
       setScreen(data.onboarding_done ? 'main' : 'onboard')
       if (!termsAccepted()) setShowTerms(true)
+      registerPush(uid, data) // fire-and-forget: enable booking push alerts
     } else {
       setScreen('onboard')
     }
