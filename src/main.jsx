@@ -66,7 +66,7 @@ Sentry.init({
 // The init promise is exposed so App.jsx can wait for it before calling
 // OneSignal.login / addTags after the worker signs in.
 window.krPushReady = OneSignal.init({
-  appId: '73690e24-f04e-4a04-b374-75943071f95c',
+  appId: '75b6ff8a-1d09-43d6-be4f-c97c42cfdd82', // "kaamready worker" app
   allowLocalhostAsSecureOrigin: true,
 }).catch(console.error)
 
