@@ -101,9 +101,11 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
   }
 
   async function uploadDoc(file, path) {
-    const { data, error } = await sb.storage.from('kyc').upload(`${user.id}/${path}`, file, { upsert:true })
+    // Unique name per upload: storage's upsert path is rejected by RLS.
+    const uniquePath = `${user.id}/${Date.now()}-${path}`
+    const { error } = await sb.storage.from('kyc').upload(uniquePath, file)
     if (error) return null
-    const { data: { publicUrl } } = sb.storage.from('kyc').getPublicUrl(`${user.id}/${path}`)
+    const { data: { publicUrl } } = sb.storage.from('kyc').getPublicUrl(uniquePath)
     return publicUrl
   }
 

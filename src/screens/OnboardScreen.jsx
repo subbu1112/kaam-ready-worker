@@ -20,10 +20,12 @@ const lbl = { fontSize:11, fontWeight:700, color:'#636366', display:'block', mar
 
 async function uploadDoc(uid, file, path) {
   if (!file) return null
-  const { error } = await sb.storage.from('kyc').upload(`${uid}/${path}`, file, { upsert:true })
+  // Unique name per upload: storage's upsert path is rejected by RLS.
+  const uniquePath = `${uid}/${Date.now()}-${path}`
+  const { error } = await sb.storage.from('kyc').upload(uniquePath, file)
   if (error) return null
   // Use signed URL (1-hour expiry) — KYC bucket is private
-  const { data } = await sb.storage.from('kyc').createSignedUrl(`${uid}/${path}`, 3600)
+  const { data } = await sb.storage.from('kyc').createSignedUrl(uniquePath, 3600)
   return data?.signedUrl || null
 }
 

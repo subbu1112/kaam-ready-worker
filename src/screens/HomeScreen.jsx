@@ -201,8 +201,10 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
   async function uploadJobPhoto(which, file) {
     if (!activeJob || !file) return
     setPhotoBusy(which)
-    const path = `${activeJob.id}/${which}.jpg`
-    const { error } = await sb.storage.from('job-photos').upload(path, file, { upsert: true })
+    // Unique name per upload: storage's upsert path is rejected by RLS, and
+    // unique names also avoid stale CDN caches on re-taken photos.
+    const path = `${activeJob.id}/${which}-${Date.now()}.jpg`
+    const { error } = await sb.storage.from('job-photos').upload(path, file)
     if (!error) {
       const { data: pub } = sb.storage.from('job-photos').getPublicUrl(path)
       const col = which==='before' ? 'photo_before_url' : 'photo_after_url'

@@ -30,7 +30,7 @@ export default function AvatarUpload({ user, userId, currentUrl, table = 'profil
       // stale cached image.
       const path = `${uid}/avatar-${Date.now()}.jpg`
       const { error: upErr } = await sb.storage.from('avatars')
-        .upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg' })
+        .upload(path, file, { contentType: file.type || 'image/jpeg' })
       if (upErr) throw upErr
       const { data } = sb.storage.from('avatars').getPublicUrl(path)
       const publicUrl = data.publicUrl
