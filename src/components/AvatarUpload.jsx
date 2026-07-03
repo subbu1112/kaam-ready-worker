@@ -64,7 +64,7 @@ export default function AvatarUpload({ user, userId, currentUrl, table = 'profil
         boxShadow:'0 2px 6px rgba(0,0,0,.2)' }}>
         {uploading ? '⏳' : '📷'}
       </div>
-      <input type="file" accept="image/*" style={{ display:'none' }} onChange={pick} disabled={uploading} />
+      <input type="file" accept="image/*" aria-label="Upload profile photo" style={{ display:'none' }} onChange={pick} disabled={uploading} />
     </label>
   )
 }
