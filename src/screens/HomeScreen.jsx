@@ -5,7 +5,7 @@ import { floorFor, COMMISSION, EMPTY_BREAKDOWN, breakdownTotal, workerShare } fr
 import { t } from '../i18n'
 const Y='#F5C000',YL='#FFF8D6',GREEN='#22c55e',RED='#ef4444'
 export default function HomeScreen({ user, profile, showToast, setTab }) {
-  const [online,    setOnline]    = useState(() => localStorage.getItem('kr_worker_online') === 'true')
+  const [online,    setOnline]    = useState(() => { try { return localStorage.getItem('kr_worker_online') === 'true' } catch { return false } })
   const [jobAlert,  setJobAlert]  = useState(null)
   const [activeJob, setActiveJob] = useState(null)
   const [todayEarn, setTodayEarn] = useState(0)
@@ -50,7 +50,7 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
   useEffect(() => {
     if (!user?.id) return
     sb.from('workers').update({ is_online: online }).eq('id', user.id).then(() => {})
-    localStorage.setItem('kr_worker_online', online)
+    try { localStorage.setItem('kr_worker_online', online) } catch { /* storage blocked */ }
   }, [online, user?.id])
 
   // Watch active job for payment status changes
@@ -192,7 +192,7 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
   }
 
   async function acceptScheduled(b) {
-    const { error } = await sb.from('bookings').update({ worker_id: user.id, status:'assigned', worker:{ id:user.id, name:profile?.name, skill:profile?.skill, rating:profile?.rating, ico:'👷' } }).eq('id', b.id).is('worker_id', null)
+    const { error } = await sb.from('bookings').update({ worker_id: user.id, status:'assigned', worker:{ id:user.id, name:profile?.name, phone:profile?.phone, skill:profile?.skill, rating:profile?.rating, ico:'👷' } }).eq('id', b.id).is('worker_id', null)
     if (error) { showToast(error.message); return }
     showToast('Scheduled job is yours ✓ 📅')
     loadScheduled()
@@ -227,7 +227,9 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
     setBusy(true)
     const pos = await getPosition()
     if (pos) sb.from('workers').update({ lat: pos.lat, lng: pos.lng }).eq('id', user.id).then(()=>{})
-    const w={id:user.id,name:profile?.name,skill:profile?.skill,rating:profile?.rating,jobs:profile?.total_jobs,ico:'👷',eta:'8 min',dist:'1.0 km',lat:pos?.lat,lng:pos?.lng}
+    // phone travels inside the customer's own booking row (RLS-protected)
+    // instead of the public workers directory.
+    const w={id:user.id,name:profile?.name,phone:profile?.phone,skill:profile?.skill,rating:profile?.rating,jobs:profile?.total_jobs,ico:'👷',eta:'8 min',dist:'1.0 km',lat:pos?.lat,lng:pos?.lng}
     // Atomic claim: only succeeds if still open AND this worker is allowed (RLS).
     // .select() returns the row only if the write actually persisted — so we never
     // show "accepted" locally while the database (and the customer) stay unchanged.

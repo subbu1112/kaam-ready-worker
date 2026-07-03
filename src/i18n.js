@@ -54,8 +54,9 @@ export const LANGS = [
   { code:'hi', label:'हिंदी' },
 ]
 
-export function getLang() { return localStorage.getItem('kr_lang') || 'en' }
-export function setLang(l) { localStorage.setItem('kr_lang', l) }
+// Guarded: privacy modes / some Android WebViews throw on localStorage access.
+export function getLang() { try { return localStorage.getItem('kr_lang') || 'en' } catch { return 'en' } }
+export function setLang(l) { try { localStorage.setItem('kr_lang', l) } catch { /* storage blocked */ } }
 export function t(str) {
   const l = getLang()
   if (l === 'en') return str

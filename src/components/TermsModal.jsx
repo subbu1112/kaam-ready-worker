@@ -1,7 +1,7 @@
 // TermsModal — shown once after first login. Stores acceptance in localStorage.
 const TERMS_KEY = 'kr_terms_accepted'
-export function termsAccepted() { return localStorage.getItem(TERMS_KEY) === '1' }
-export function acceptTerms()   { localStorage.setItem(TERMS_KEY, '1') }
+export function termsAccepted() { try { return localStorage.getItem(TERMS_KEY) === '1' } catch { return false } }
+export function acceptTerms()   { try { localStorage.setItem(TERMS_KEY, '1') } catch { /* storage blocked */ } }
 
 export default function TermsModal({ onAccept, dark = false }) {
   const bg   = dark ? '#111' : '#fff'
