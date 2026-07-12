@@ -321,9 +321,12 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
         <span onClick={() => setTab && setTab('notifications')} style={{ color:'#fff', fontSize:14, cursor:'pointer' }}>🔔</span>
       </div>
       <div style={{ background:'#1C1C1E', padding:'10px 20px 16px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
-        <div>
-          <h1 style={{ color:Y, fontSize:20, fontWeight:800 }}>Kaam Ready ⚡</h1>
-          <p style={{ color:'#636366', fontSize:12 }}>{profile?.skill} · {profile?.city}</p>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <img src="/icon-192.png" alt="Kaam Ready" style={{ width:36, height:36, borderRadius:9 }} />
+          <div>
+            <h1 style={{ color:Y, fontSize:20, fontWeight:800 }}>Kaam Ready</h1>
+            <p style={{ color:'#636366', fontSize:12 }}>{profile?.skill} · {profile?.city}</p>
+          </div>
         </div>
         <div onClick={toggleOnline} style={{ width:52, height:28, borderRadius:20, background:online?GREEN:'#3A3A3C', position:'relative', cursor:'pointer', transition:'background .2s' }}>
           <div style={{ width:22, height:22, background:'#fff', borderRadius:'50%', position:'absolute', top:3, left:online?27:3, transition:'left .2s', boxShadow:'0 1px 4px rgba(0,0,0,.3)' }} />
