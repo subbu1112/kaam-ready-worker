@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { sb } from '../lib/supabase'
-const Y='#F5C000', YL='#FFF8D6', BK='#1C1C1E'
+const Y='#F5C000', YL='#FFF7DA', BK='#1A1A1A'
 
 const SKILLS = [
   { id:'elec', lbl:'Electrician', ico:'⚡' },
@@ -15,8 +15,8 @@ const SKILLS = [
 
 const CITIES = ['Bengaluru','Mysuru','Mangaluru','Hubballi','Belagavi','Tumakuru','Shivamogga','Davangere','Kalaburagi','Udupi']
 
-const inp = { width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:12, padding:12, fontSize:15, outline:'none', fontFamily:'inherit', color:'#fff', boxSizing:'border-box' }
-const lbl = { fontSize:11, fontWeight:700, color:'#636366', display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:.5 }
+const inp = { width:'100%', background:'#FFFFFF', border:'1.5px solid #E9E9EB', borderRadius:12, padding:12, fontSize:15, outline:'none', fontFamily:'inherit', color:'#1A1A1A', boxSizing:'border-box' }
+const lbl = { fontSize:11, fontWeight:700, color:'#6B6B70', display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:.5 }
 
 async function uploadDoc(uid, file, path) {
   if (!file) return null
@@ -131,17 +131,17 @@ export default function OnboardScreen({ user, showToast, setScreen, setProfile }
   const progress = ((step) / 4) * 100
 
   return (
-    <div style={{ height:'100vh', display:'flex', flexDirection:'column', background:'#111', overflowY:'auto' }}>
+    <div style={{ height:'100vh', display:'flex', flexDirection:'column', background:'#F4F5F6', overflowY:'auto' }}>
       {/* Header */}
-      <div style={{ background:BK, padding:'48px 20px 20px', flexShrink:0 }}>
-        <h1 style={{ fontSize:24, fontWeight:900, color:Y, marginBottom:4 }}>👷 Join Kaam Ready</h1>
-        <p style={{ fontSize:13, color:'#555' }}>Step {step+1} of 5 — {stepLabels[step]}</p>
-        <div style={{ marginTop:12, background:'#2a2a2a', borderRadius:8, height:6 }}>
+      <div style={{ background:'#FFFFFF', borderBottom:'1px solid #E9E9EB', padding:'20px 20px 18px', flexShrink:0 }}>
+        <h1 style={{ fontSize:24, fontWeight:900, color:'#1A1A1A', marginBottom:4 }}>👷 Join Kaam Ready</h1>
+        <p style={{ fontSize:13, color:'#9A9AA0' }}>Step {step+1} of 5 — {stepLabels[step]}</p>
+        <div style={{ marginTop:12, background:'#EFEFF1', borderRadius:8, height:6 }}>
           <div style={{ background:Y, height:6, borderRadius:8, width:progress+'%', transition:'width .3s' }} />
         </div>
         <div style={{ display:'flex', gap:6, marginTop:8 }}>
           {stepLabels.map((l, i) => (
-            <div key={l} style={{ flex:1, textAlign:'center', fontSize:9, fontWeight:700, color: i<=step ? Y : '#333', textTransform:'uppercase' }}>{l}</div>
+            <div key={l} style={{ flex:1, textAlign:'center', fontSize:9, fontWeight:700, color: i<=step ? '#B8900A' : '#C6C6C9', textTransform:'uppercase' }}>{l}</div>
           ))}
         </div>
       </div>
@@ -184,15 +184,15 @@ export default function OnboardScreen({ user, showToast, setScreen, setProfile }
         {/* Step 1 — Skills */}
         {step === 1 && (
           <>
-            <p style={{ color:'#888', fontSize:13 }}>Select your primary skill and any additional skills.</p>
+            <p style={{ color:'#6B6B70', fontSize:13 }}>Select your primary skill and any additional skills.</p>
             <div>
               <label style={lbl}>Primary Skill *</label>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                 {SKILLS.map(s => (
                   <button key={s.id} onClick={() => setSkill(s.id)}
-                    style={{ padding:'12px 8px', borderRadius:12, border:'1.5px solid '+(skill===s.id?Y:'#2a2a2a'),
-                      background:skill===s.id?YL:'#1a1a1a', cursor:'pointer', fontFamily:'inherit',
-                      fontSize:13, fontWeight:700, color:skill===s.id?'#1C1C1E':'#888', display:'flex', alignItems:'center', gap:6, justifyContent:'center' }}>
+                    style={{ padding:'12px 8px', borderRadius:12, border:'1.5px solid '+(skill===s.id?Y:'#E9E9EB'),
+                      background:skill===s.id?YL:'#FAFAFA', cursor:'pointer', fontFamily:'inherit',
+                      fontSize:13, fontWeight:700, color:skill===s.id?'#1A1A1A':'#6B6B70', display:'flex', alignItems:'center', gap:6, justifyContent:'center' }}>
                     {s.ico} {s.lbl}
                   </button>
                 ))}
@@ -203,9 +203,9 @@ export default function OnboardScreen({ user, showToast, setScreen, setProfile }
               <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
                 {SKILLS.filter(s => s.id !== skill).map(s => (
                   <button key={s.id} onClick={() => setSkills(prev => prev.includes(s.id) ? prev.filter(x=>x!==s.id) : [...prev,s.id])}
-                    style={{ padding:'8px 14px', borderRadius:20, border:'1.5px solid '+(skills.includes(s.id)?Y:'#2a2a2a'),
-                      background:skills.includes(s.id)?YL:'#1a1a1a', cursor:'pointer', fontFamily:'inherit',
-                      fontSize:12, fontWeight:600, color:skills.includes(s.id)?'#1C1C1E':'#888' }}>
+                    style={{ padding:'8px 14px', borderRadius:20, border:'1.5px solid '+(skills.includes(s.id)?Y:'#E9E9EB'),
+                      background:skills.includes(s.id)?YL:'#FAFAFA', cursor:'pointer', fontFamily:'inherit',
+                      fontSize:12, fontWeight:600, color:skills.includes(s.id)?'#1A1A1A':'#6B6B70' }}>
                     {s.ico} {s.lbl}
                   </button>
                 ))}
@@ -220,14 +220,14 @@ export default function OnboardScreen({ user, showToast, setScreen, setProfile }
             <div>
               <label style={lbl}>UPI ID * (for receiving payments)</label>
               <input value={upiId} onChange={e=>setUpiId(e.target.value)} placeholder="yourname@paytm" style={inp} />
-              <p style={{ fontSize:11, color:'#555', marginTop:6 }}>Example: raju@paytm, raju@gpay, raju@ybl</p>
+              <p style={{ fontSize:11, color:'#9A9AA0', marginTop:6 }}>Example: raju@paytm, raju@gpay, raju@ybl</p>
             </div>
             <div>
               <label style={lbl}>Minimum Price per Job (₹)</label>
               <input value={priceMin} onChange={e=>setPriceMin(e.target.value.replace(/\D/g,''))} type="number" placeholder="200" style={inp} />
             </div>
-            <div style={{ background:'#1a1a1a', borderRadius:12, padding:'12px 14px', border:'1px solid #2a2a2a' }}>
-              <p style={{ color:'#555', fontSize:12, lineHeight:1.6 }}>
+            <div style={{ background:'#FAFAFA', borderRadius:12, padding:'12px 14px', border:'1px solid #E9E9EB' }}>
+              <p style={{ color:'#9A9AA0', fontSize:12, lineHeight:1.6 }}>
                 💡 Kaam Ready takes 10% commission on each job. You keep 90% of every booking.
               </p>
             </div>
@@ -237,25 +237,25 @@ export default function OnboardScreen({ user, showToast, setScreen, setProfile }
         {/* Step 3 — Aadhaar KYC */}
         {step === 3 && (
           <>
-            <div style={{ background:'#1a2e1a', borderRadius:12, padding:'12px 14px', border:'1px solid #16a34a' }}>
-              <p style={{ color:'#4ade80', fontSize:12, lineHeight:1.6 }}>
+            <div style={{ background:'#E7F7EE', borderRadius:12, padding:'12px 14px', border:'1px solid #0FA958' }}>
+              <p style={{ color:'#0FA958', fontSize:12, lineHeight:1.6 }}>
                 🔒 KYC is required to receive payments. Your documents are securely stored and only reviewed by KaamReady admins.
               </p>
-              <p style={{ color:'#86efac', fontSize:11, lineHeight:1.6, marginTop:8 }}>
+              <p style={{ color:'#0B6B39', fontSize:11, lineHeight:1.6, marginTop:8 }}>
                 📋 <strong>Data Storage Notice:</strong> We store your Aadhaar and PAN documents securely on encrypted servers. By uploading, you consent to our KYC policy — your ID documents are used solely for identity verification and payment compliance (Income Tax Act, 1961). We never share your documents with third parties without your consent.
               </p>
             </div>
             <div>
               <label style={lbl}>Aadhaar Card — Front Side *</label>
               <input type="file" accept="image/*" onChange={e=>setAadharFront(e.target.files[0])}
-                style={{ color:'#aaa', fontSize:13, width:'100%' }} />
-              {aadharFront && <p style={{ fontSize:11, color:'#22c55e', marginTop:4 }}>✓ {aadharFront.name}</p>}
+                style={{ color:'#6B6B70', fontSize:13, width:'100%' }} />
+              {aadharFront && <p style={{ fontSize:11, color:'#0FA958', marginTop:4 }}>✓ {aadharFront.name}</p>}
             </div>
             <div>
               <label style={lbl}>Aadhaar Card — Back Side *</label>
               <input type="file" accept="image/*" onChange={e=>setAadharBack(e.target.files[0])}
-                style={{ color:'#aaa', fontSize:13, width:'100%' }} />
-              {aadharBack && <p style={{ fontSize:11, color:'#22c55e', marginTop:4 }}>✓ {aadharBack.name}</p>}
+                style={{ color:'#6B6B70', fontSize:13, width:'100%' }} />
+              {aadharBack && <p style={{ fontSize:11, color:'#0FA958', marginTop:4 }}>✓ {aadharBack.name}</p>}
             </div>
             <div>
               <label style={lbl}>Aadhaar Number *</label>
@@ -267,16 +267,16 @@ export default function OnboardScreen({ user, showToast, setScreen, setProfile }
         {/* Step 4 — PAN (optional) */}
         {step === 4 && (
           <>
-            <div style={{ background:'#1a1a2e', borderRadius:12, padding:'12px 14px', border:'1px solid #6366f1' }}>
-              <p style={{ color:'#a5b4fc', fontSize:12, lineHeight:1.6 }}>
+            <div style={{ background:'#E8F0FE', borderRadius:12, padding:'12px 14px', border:'1px solid #6366f1' }}>
+              <p style={{ color:'#2563EB', fontSize:12, lineHeight:1.6 }}>
                 📄 PAN card is optional but required for earnings above ₹50,000/year for tax purposes.
               </p>
             </div>
             <div>
               <label style={lbl}>PAN Card Photo (Optional)</label>
               <input type="file" accept="image/*" onChange={e=>setPanFront(e.target.files[0])}
-                style={{ color:'#aaa', fontSize:13, width:'100%' }} />
-              {panFront && <p style={{ fontSize:11, color:'#22c55e', marginTop:4 }}>✓ {panFront.name}</p>}
+                style={{ color:'#6B6B70', fontSize:13, width:'100%' }} />
+              {panFront && <p style={{ fontSize:11, color:'#0FA958', marginTop:4 }}>✓ {panFront.name}</p>}
             </div>
             <div>
               <label style={lbl}>PAN Number (Optional)</label>
@@ -289,13 +289,13 @@ export default function OnboardScreen({ user, showToast, setScreen, setProfile }
         <div style={{ display:'flex', gap:10, marginTop:8 }}>
           {step > 0 && (
             <button onClick={() => setStep(s => s - 1)}
-              style={{ flex:1, background:'#1a1a1a', border:'1.5px solid #2a2a2a', borderRadius:14, padding:15, fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:'inherit', color:'#fff' }}>
+              style={{ flex:1, background:'#FFFFFF', border:'1.5px solid #E9E9EB', borderRadius:14, padding:15, fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:'inherit', color:'#1A1A1A' }}>
               ← Back
             </button>
           )}
           {step === 4 && (
             <button onClick={() => finish()}
-              style={{ background:'transparent', border:'1.5px solid #444', borderRadius:14, padding:'15px 20px', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit', color:'#666' }}>
+              style={{ background:'transparent', border:'1.5px solid #9A9AA0', borderRadius:14, padding:'15px 20px', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit', color:'#6B6B70' }}>
               Skip PAN
             </button>
           )}

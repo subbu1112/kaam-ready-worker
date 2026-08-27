@@ -78,24 +78,24 @@ export default function LoginScreen({ setScreen, showToast }) {
 
   const inp = (val, set, placeholder, type='text') => (
     <input value={val} onChange={e => set(e.target.value)} placeholder={placeholder} type={type}
-      style={{ width:'100%', border:'1.5px solid #2a2a2a', borderRadius:12, padding:'13px 14px',
-        fontSize:14, outline:'none', fontFamily:'inherit', background:'#1a1a1a', color:'#fff',
+      style={{ width:'100%', border:'1.5px solid #E9E9EB', borderRadius:12, padding:'13px 14px',
+        fontSize:14, outline:'none', fontFamily:'inherit', background:'#FAFAFA', color:'#1A1A1A',
         marginBottom:12, boxSizing:'border-box' }} />
   )
 
   return (
-    <div style={{ height:'100vh', background:'#0A0A0A', display:'flex', flexDirection:'column', maxWidth:430, margin:'0 auto', width:'100%' }}>
+    <div style={{ height:'100vh', background:'#F4F5F6', display:'flex', flexDirection:'column', maxWidth:430, margin:'0 auto', width:'100%' }}>
       <div style={{ background:Y, padding:'40px 24px 28px', textAlign:'center' }}>
         <img src="/icon-192.png" alt="Kaam Ready" style={{ width:72, height:72, borderRadius:16, marginBottom:10, boxShadow:'0 4px 14px rgba(0,0,0,.2)' }} />
         <h1 style={{ fontSize:28, fontWeight:800 }}>Kaam Ready</h1>
         <p style={{ fontSize:13, color:'rgba(0,0,0,.6)', marginTop:4 }}>Worker Dashboard</p>
       </div>
 
-      <div style={{ display:'flex', margin:'20px 20px 0', background:'#111', borderRadius:12, padding:4, gap:4 }}>
+      <div style={{ display:'flex', margin:'20px 20px 0', background:'#FFFFFF', border:'1px solid #E9E9EB', borderRadius:12, padding:4, gap:4 }}>
         {[['phone','📱 Phone OTP'],['email','✉️ Email']].map(([t,l]) => (
           <button key={t} onClick={() => { setTab(t); setResetMode(false); setResetSent(false) }}
             style={{ flex:1, padding:'10px 0', borderRadius:9, border:'none', fontWeight:700, fontSize:13,
-              background:tab===t?Y:'transparent', color:tab===t?'#000':'#555',
+              background:tab===t?Y:'transparent', color:tab===t?'#000':'#9A9AA0',
               cursor:'pointer', fontFamily:'inherit' }}>
             {l}
           </button>
@@ -104,15 +104,15 @@ export default function LoginScreen({ setScreen, showToast }) {
 
       <div style={{ padding:20, display:'flex', flexDirection:'column', gap:14, flex:1 }}>
         {tab === 'phone' ? (
-          <div style={{ background:'#111', borderRadius:20, padding:20, border:'1px solid #222' }}>
-            <p style={{ fontWeight:800, fontSize:16, color:'#fff', marginBottom:4 }}>Sign in with Phone</p>
-            <p style={{ fontSize:13, color:'#555', marginBottom:16 }}>We'll send a 6-digit OTP via SMS</p>
+          <div style={{ background:'#FFFFFF', borderRadius:20, padding:20, border:'1px solid #E9E9EB', boxShadow:'0 1px 3px rgba(16,24,40,.06)' }}>
+            <p style={{ fontWeight:800, fontSize:16, color:'#1A1A1A', marginBottom:4 }}>Sign in with Phone</p>
+            <p style={{ fontSize:13, color:'#9A9AA0', marginBottom:16 }}>We'll send a 6-digit OTP via SMS</p>
             <div style={{ display:'flex', gap:8, marginBottom:14 }}>
-              <div style={{ background:'#1a1a1a', borderRadius:12, padding:'13px 14px', fontWeight:700, fontSize:14, color:'#fff', border:'1.5px solid #2a2a2a' }}>🇮🇳 +91</div>
+              <div style={{ background:'#FAFAFA', borderRadius:12, padding:'13px 14px', fontWeight:700, fontSize:14, color:'#1A1A1A', border:'1.5px solid #E9E9EB' }}>🇮🇳 +91</div>
               <input value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g,'').slice(0,10))}
                 placeholder="98765 43210" type="tel"
-                style={{ flex:1, border:'1.5px solid #2a2a2a', borderRadius:12, padding:'13px 14px',
-                  fontSize:14, outline:'none', fontFamily:'inherit', background:'#1a1a1a', color:'#fff' }} />
+                style={{ flex:1, border:'1.5px solid #E9E9EB', borderRadius:12, padding:'13px 14px',
+                  fontSize:14, outline:'none', fontFamily:'inherit', background:'#FAFAFA', color:'#1A1A1A' }} />
             </div>
             <button onClick={sendOTP} disabled={busy}
               style={{ width:'100%', background:Y, border:'none', borderRadius:14, padding:16, fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'inherit', opacity:busy?0.6:1 }}>
@@ -120,13 +120,13 @@ export default function LoginScreen({ setScreen, showToast }) {
             </button>
           </div>
         ) : resetMode ? (
-          <div style={{ background:'#111', borderRadius:20, padding:20, border:'1px solid #222' }}>
+          <div style={{ background:'#FFFFFF', borderRadius:20, padding:20, border:'1px solid #E9E9EB', boxShadow:'0 1px 3px rgba(16,24,40,.06)' }}>
             {resetSent ? (
               <>
                 <div style={{ textAlign:'center', padding:'8px 0 16px' }}>
                   <div style={{ fontSize:44, marginBottom:12 }}>📧</div>
-                  <p style={{ fontWeight:800, fontSize:16, color:'#fff' }}>Reset link sent!</p>
-                  <p style={{ fontSize:13, color:'#555', marginTop:6 }}>Check your email and follow the link to reset your password.</p>
+                  <p style={{ fontWeight:800, fontSize:16, color:'#1A1A1A' }}>Reset link sent!</p>
+                  <p style={{ fontSize:13, color:'#9A9AA0', marginTop:6 }}>Check your email and follow the link to reset your password.</p>
                 </div>
                 <button onClick={() => { setResetMode(false); setResetSent(false) }}
                   style={{ width:'100%', background:Y, border:'none', borderRadius:14, padding:16, fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'inherit' }}>
@@ -135,27 +135,27 @@ export default function LoginScreen({ setScreen, showToast }) {
               </>
             ) : (
               <>
-                <p style={{ fontWeight:800, fontSize:16, color:'#fff', marginBottom:4 }}>Forgot Password</p>
-                <p style={{ fontSize:13, color:'#555', marginBottom:16 }}>Enter your email to receive a reset link</p>
+                <p style={{ fontWeight:800, fontSize:16, color:'#1A1A1A', marginBottom:4 }}>Forgot Password</p>
+                <p style={{ fontSize:13, color:'#9A9AA0', marginBottom:16 }}>Enter your email to receive a reset link</p>
                 {inp(email, setEmail, 'you@example.com', 'email')}
                 <button onClick={sendReset} disabled={busy}
                   style={{ width:'100%', background:Y, border:'none', borderRadius:14, padding:16, fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'inherit', opacity:busy?0.6:1 }}>
                   {busy ? 'Sending...' : 'Send Reset Link →'}
                 </button>
                 <button onClick={() => setResetMode(false)}
-                  style={{ display:'block', width:'100%', marginTop:10, background:'none', border:'none', color:'#555', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+                  style={{ display:'block', width:'100%', marginTop:10, background:'none', border:'none', color:'#9A9AA0', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
                   Back to Sign In
                 </button>
               </>
             )}
           </div>
         ) : (
-          <div style={{ background:'#111', borderRadius:20, padding:20, border:'1px solid #222' }}>
-            <div style={{ display:'flex', marginBottom:16, borderBottom:'1px solid #222' }}>
+          <div style={{ background:'#FFFFFF', borderRadius:20, padding:20, border:'1px solid #E9E9EB', boxShadow:'0 1px 3px rgba(16,24,40,.06)' }}>
+            <div style={{ display:'flex', marginBottom:16, borderBottom:'1px solid #E9E9EB' }}>
               {[['Sign In', false],['Sign Up', true]].map(([l,r]) => (
                 <button key={l} onClick={() => setIsReg(r)}
-                  style={{ flex:1, padding:'8px 0', border:'none', borderBottom:'2px solid '+(isReg===r?Y:'transparent'),
-                    background:'none', fontWeight:700, fontSize:13, color:isReg===r?Y:'#555', cursor:'pointer', fontFamily:'inherit' }}>
+                  style={{ flex:1, padding:'8px 0', border:'none', borderBottom:'2px solid '+(isReg===r?'#1A1A1A':'transparent'),
+                    background:'none', fontWeight:700, fontSize:13, color:isReg===r?'#1A1A1A':'#9A9AA0', cursor:'pointer', fontFamily:'inherit' }}>
                   {l}
                 </button>
               ))}
@@ -168,7 +168,7 @@ export default function LoginScreen({ setScreen, showToast }) {
             </button>
             {!isReg && (
               <button onClick={() => setResetMode(true)}
-                style={{ display:'block', width:'100%', marginTop:10, background:'none', border:'none', color:'#555', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+                style={{ display:'block', width:'100%', marginTop:10, background:'none', border:'none', color:'#9A9AA0', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
                 Forgot password?
               </button>
             )}
@@ -176,14 +176,14 @@ export default function LoginScreen({ setScreen, showToast }) {
         )}
 
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <div style={{ flex:1, height:1, background:'#222' }} />
-          <span style={{ fontSize:12, color:'#555' }}>or</span>
-          <div style={{ flex:1, height:1, background:'#222' }} />
+          <div style={{ flex:1, height:1, background:'#E4E4E7' }} />
+          <span style={{ fontSize:12, color:'#9A9AA0' }}>or</span>
+          <div style={{ flex:1, height:1, background:'#E4E4E7' }} />
         </div>
         <button onClick={googleAuth} disabled={busy}
           style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, width:'100%',
-            background:'#fff', border:'none', borderRadius:14, padding:'14px', fontSize:14, fontWeight:700,
-            cursor:'pointer', fontFamily:'inherit', color:'#1C1C1E', opacity:busy?0.6:1 }}>
+            background:'#FFFFFF', border:'1.5px solid #E9E9EB', borderRadius:14, padding:'14px', fontSize:14, fontWeight:700,
+            cursor:'pointer', fontFamily:'inherit', color:'#1A1A1A', opacity:busy?0.6:1 }}>
           <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
             <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-22 0-1.2-.1-2.3-.4-3.5z"/>
             <path fill="#FF3D00" d="M3.3 12.7l6.6 4.8C11.5 14 17.3 10 24 10c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 4.1 29.6 2 24 2 15.3 2 7.8 6.9 3.3 12.7z"/>

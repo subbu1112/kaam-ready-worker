@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { sb } from '../lib/supabase'
 import { workerShare } from '../constants'
 
-const Y='#F5C000', YL='#FFF8D6', GREEN='#22c55e', RED='#ef4444', BK='#1C1C1E'
+const Y='#F5C000', YL='#FFF7DA', GREEN='#0FA958', RED='#E5484D', BK='#FFFFFF'
 const MIN_WITHDRAW = 100
 
 const fmt = n => '₹' + (Number(n) || 0).toLocaleString('en-IN')
@@ -90,40 +90,39 @@ export default function WalletScreen({ user, profile, showToast, reloadProfile }
   ].sort((a, b) => new Date(b.at) - new Date(a.at))
 
   return (
-    <div style={{ flex:1, minHeight:0, position:'relative' }}>
-      <div style={{ position:'absolute', inset:0, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:16, paddingBottom:32, display:'flex', flexDirection:'column', gap:14 }}>
-
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-          <h1 style={{ color:'#fff', fontSize:20, fontWeight:800 }}>💰 Wallet</h1>
-        </div>
+    <div style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column' }}>
+      <div style={{ background:'#FFFFFF', borderBottom:'1px solid #E9E9EB', padding:'15px 16px', flexShrink:0 }}>
+        <h1 style={{ color:'#1A1A1A', fontSize:16, fontWeight:700 }}>Wallet</h1>
+      </div>
+      <div style={{ flex:1, minHeight:0, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:16, paddingBottom:32, display:'flex', flexDirection:'column', gap:14 }}>
 
         {/* Balance card */}
-        <div style={{ background:`linear-gradient(135deg, ${Y} 0%, #B8900A 100%)`, borderRadius:20, padding:'22px 20px', color:'#1a1a1a' }}>
+        <div style={{ background:`linear-gradient(135deg, ${Y} 0%, #B8900A 100%)`, borderRadius:20, padding:'22px 20px', color:'#1A1A1A', boxShadow:'0 4px 16px rgba(245,192,0,.28)' }}>
           <p style={{ fontSize:12, fontWeight:700, opacity:.7 }}>Available to Withdraw</p>
           <p style={{ fontSize:38, fontWeight:900, lineHeight:1.1, marginTop:4 }}>{fmt(balance - pendingWithdraw)}</p>
           {pendingWithdraw > 0 && (
             <p style={{ fontSize:12, fontWeight:600, marginTop:6, opacity:.75 }}>⏳ {fmt(pendingWithdraw)} withdrawal in progress · wallet {fmt(balance)}</p>
           )}
           <button onClick={() => setShowForm(v => !v)}
-            style={{ marginTop:16, width:'100%', background:'#1a1a1a', color:Y, border:'none', borderRadius:14, padding:14, fontWeight:800, fontSize:15, cursor:'pointer', fontFamily:'inherit' }}>
+            style={{ marginTop:16, width:'100%', background:'#1A1A1A', color:'#FFFFFF', border:'none', borderRadius:14, padding:14, fontWeight:800, fontSize:15, cursor:'pointer', fontFamily:'inherit' }}>
             {showForm ? 'Close' : '↓ Withdraw to UPI'}
           </button>
         </div>
 
         {/* Withdraw form */}
         {showForm && (
-          <div style={{ background:BK, borderRadius:16, padding:16, border:'1px solid #2a2a2a' }}>
-            <p style={{ color:Y, fontWeight:800, fontSize:14, marginBottom:10 }}>Request a Withdrawal</p>
-            <label style={{ fontSize:10, fontWeight:700, color:'#636366', display:'block', marginBottom:5, textTransform:'uppercase' }}>Amount ₹</label>
+          <div style={{ background:BK, borderRadius:16, padding:16, border:'1px solid #E9E9EB' }}>
+            <p style={{ color:'#1A1A1A', fontWeight:800, fontSize:14, marginBottom:10 }}>Request a Withdrawal</p>
+            <label style={{ fontSize:10, fontWeight:700, color:'#6B6B70', display:'block', marginBottom:5, textTransform:'uppercase' }}>Amount ₹</label>
             <input value={amount} onChange={e => setAmount(e.target.value.replace(/\D/g,'').slice(0,6))} type="tel" inputMode="numeric" placeholder={`Min ${fmt(MIN_WITHDRAW)}`}
-              style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:12, fontSize:16, fontWeight:700, color:'#fff', outline:'none', fontFamily:'inherit', boxSizing:'border-box', marginBottom:10 }} />
-            <label style={{ fontSize:10, fontWeight:700, color:'#636366', display:'block', marginBottom:5, textTransform:'uppercase' }}>UPI ID</label>
+              style={{ width:'100%', background:'#F4F5F6', border:'1.5px solid #E9E9EB', borderRadius:10, padding:12, fontSize:16, fontWeight:700, color:'#1A1A1A', outline:'none', fontFamily:'inherit', boxSizing:'border-box', marginBottom:10 }} />
+            <label style={{ fontSize:10, fontWeight:700, color:'#6B6B70', display:'block', marginBottom:5, textTransform:'uppercase' }}>UPI ID</label>
             <input value={upi} onChange={e => setUpi(e.target.value.trim())} placeholder="yourname@upi"
-              style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:12, fontSize:14, color:'#fff', outline:'none', fontFamily:'inherit', boxSizing:'border-box', marginBottom:6 }} />
+              style={{ width:'100%', background:'#F4F5F6', border:'1.5px solid #E9E9EB', borderRadius:10, padding:12, fontSize:14, color:'#1A1A1A', outline:'none', fontFamily:'inherit', boxSizing:'border-box', marginBottom:6 }} />
             <div style={{ display:'flex', gap:6, marginBottom:12 }}>
               {[balance - pendingWithdraw, 500, 1000].filter(v => v >= MIN_WITHDRAW && v <= (balance - pendingWithdraw)).map(v => (
                 <button key={v} onClick={() => setAmount(String(Math.floor(v)))}
-                  style={{ flex:1, background:'#111', color:'#aaa', border:'1px solid #2a2a2a', borderRadius:8, padding:'7px 0', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                  style={{ flex:1, background:'#F4F5F6', color:'#6B6B70', border:'1px solid #E9E9EB', borderRadius:8, padding:'7px 0', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
                   {v === (balance - pendingWithdraw) ? 'All' : fmt(v)}
                 </button>
               ))}
@@ -132,29 +131,29 @@ export default function WalletScreen({ user, profile, showToast, reloadProfile }
               style={{ width:'100%', background:Y, border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer', opacity:busy?0.6:1, fontFamily:'inherit' }}>
               {busy ? 'Submitting…' : 'Submit Request ✓'}
             </button>
-            <p style={{ color:'#555', fontSize:11, marginTop:8, textAlign:'center' }}>Paid out by KaamReady admin, usually within 24 hours.</p>
+            <p style={{ color:'#9A9AA0', fontSize:11, marginTop:8, textAlign:'center' }}>Paid out by KaamReady admin, usually within 24 hours.</p>
           </div>
         )}
 
         {/* Transaction history */}
         <div>
-          <p style={{ color:'#fff', fontWeight:800, fontSize:15, marginBottom:8 }}>Transaction History</p>
+          <p style={{ color:'#1A1A1A', fontWeight:800, fontSize:15, marginBottom:8 }}>Transaction History</p>
           {loading ? (
-            <p style={{ color:'#777', fontSize:13, textAlign:'center', padding:24 }}>Loading…</p>
+            <p style={{ color:'#6B6B70', fontSize:13, textAlign:'center', padding:24 }}>Loading…</p>
           ) : ledger.length === 0 ? (
-            <div style={{ background:BK, borderRadius:16, padding:'28px 20px', textAlign:'center', border:'1px dashed #2a2a2a' }}>
+            <div style={{ background:BK, borderRadius:16, padding:'28px 20px', textAlign:'center', border:'1px dashed #E9E9EB' }}>
               <div style={{ fontSize:36, marginBottom:8 }}>🧾</div>
-              <p style={{ color:'#aaa', fontSize:14, fontWeight:700 }}>No transactions yet</p>
-              <p style={{ color:'#555', fontSize:12, marginTop:4 }}>Complete jobs to start earning.</p>
+              <p style={{ color:'#6B6B70', fontSize:14, fontWeight:700 }}>No transactions yet</p>
+              <p style={{ color:'#9A9AA0', fontSize:12, marginTop:4 }}>Complete jobs to start earning.</p>
             </div>
           ) : ledger.map(tx => (
-            <div key={tx.key} style={{ display:'flex', alignItems:'center', gap:12, background:BK, borderRadius:14, padding:'12px 14px', marginBottom:8, border:'1px solid #2a2a2a' }}>
-              <div style={{ width:38, height:38, borderRadius:11, background: tx.type==='credit' ? '#0d2818' : '#2a1a1a', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>
+            <div key={tx.key} style={{ display:'flex', alignItems:'center', gap:12, background:BK, borderRadius:14, padding:'12px 14px', marginBottom:8, border:'1px solid #E9E9EB' }}>
+              <div style={{ width:38, height:38, borderRadius:11, background: tx.type==='credit' ? '#E7F7EE' : '#FDECEC', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>
                 {tx.type==='credit' ? '↓' : '↑'}
               </div>
               <div style={{ flex:1, minWidth:0 }}>
-                <p style={{ color:'#fff', fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{tx.label}</p>
-                <p style={{ color:'#636366', fontSize:11, marginTop:2 }}>{tx.sub} · {fmtDate(tx.at)}</p>
+                <p style={{ color:'#1A1A1A', fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{tx.label}</p>
+                <p style={{ color:'#6B6B70', fontSize:11, marginTop:2 }}>{tx.sub} · {fmtDate(tx.at)}</p>
               </div>
               <div style={{ textAlign:'right', flexShrink:0 }}>
                 <p style={{ color: tx.amount >= 0 ? GREEN : '#fff', fontSize:14, fontWeight:800 }}>

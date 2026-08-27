@@ -11,12 +11,12 @@ L.Icon.Default.mergeOptions({
 })
 
 const WORKER_ICON = L.divIcon({
-  html: '<div style="background:#F5C000;border:2px solid #000;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px">👷</div>',
+  html: '<div style="background:#F5C000;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px">👷</div>',
   iconSize: [32, 32], iconAnchor: [16, 16], className: ''
 })
 
 const HOME_ICON = L.divIcon({
-  html: '<div style="background:#22c55e;border:2px solid #fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px">📍</div>',
+  html: '<div style="background:#0FA958;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px">📍</div>',
   iconSize: [32, 32], iconAnchor: [16, 16], className: ''
 })
 
@@ -37,7 +37,7 @@ export default function MapView({ workerLat, workerLng, customerLat, customerLng
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map)
     L.marker([cLat, cLng], { icon: HOME_ICON }).addTo(map).bindPopup('Your location')
     workerMarkerRef.current = L.marker([wLat, wLng], { icon: WORKER_ICON }).addTo(map).bindPopup('Worker')
-    L.polyline([[cLat, cLng], [wLat, wLng]], { color: '#F5C000', weight: 3, dashArray: '6,6' }).addTo(map)
+    L.polyline([[cLat, cLng], [wLat, wLng]], { color: '#0FA958', weight: 3, dashArray: '6,6' }).addTo(map)
     mapInstanceRef.current = map
     // Fix grey/blank tiles: container is sized after first paint
     const t1 = setTimeout(() => map.invalidateSize(), 100)

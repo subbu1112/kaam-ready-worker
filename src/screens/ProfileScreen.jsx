@@ -4,15 +4,15 @@ import AvatarUpload from '../components/AvatarUpload'
 import { loadSettings, SETTINGS_DEFAULTS } from '../lib/settings'
 import { getLang, setLang, LANGS, t } from '../i18n'
 
-const Y='#F5C000', YD='#B8900A', YL='#FFF8D6', BK='#1C1C1E', GREEN='#22c55e'
+const Y='#F5C000', YD='#B8900A', YL='#FFF7DA', BK='#1A1A1A', GREEN='#0FA958'
 
 function Modal({ title, onClose, children }) {
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.85)', zIndex:999, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
-      <div style={{ background:'#1a1a1a', borderRadius:'24px 24px 0 0', width:'100%', maxWidth:430, padding:'20px 20px 40px', maxHeight:'90vh', overflowY:'auto' }}>
+    <div style={{ position:'fixed', inset:0, background:'rgba(16,24,40,.45)', zIndex:999, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+      <div style={{ background:'#FFFFFF', borderRadius:'24px 24px 0 0', width:'100%', maxWidth:430, padding:'20px 20px 40px', maxHeight:'90vh', overflowY:'auto' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-          <p style={{ fontWeight:800, fontSize:17, color:'#fff' }}>{title}</p>
-          <button onClick={onClose} style={{ background:'#2a2a2a', border:'none', borderRadius:10, padding:'6px 14px', cursor:'pointer', fontFamily:'inherit', fontWeight:600, color:'#fff' }}>Close</button>
+          <p style={{ fontWeight:800, fontSize:17, color:'#1A1A1A' }}>{title}</p>
+          <button onClick={onClose} style={{ background:'#E9E9EB', border:'none', borderRadius:10, padding:'6px 14px', cursor:'pointer', fontFamily:'inherit', fontWeight:600, color:'#1A1A1A' }}>Close</button>
         </div>
         {children}
       </div>
@@ -23,9 +23,9 @@ function Modal({ title, onClose, children }) {
 function Field({ label, value, onChange, type='text', placeholder='' }) {
   return (
     <div style={{ marginBottom:14 }}>
-      <label style={{ fontSize:11, fontWeight:700, color:'#636366', display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:.5 }}>{label}</label>
+      <label style={{ fontSize:11, fontWeight:700, color:'#6B6B70', display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:.5 }}>{label}</label>
       <input value={value} onChange={e => onChange(e.target.value)} type={type} placeholder={placeholder}
-        style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:12, padding:12, fontSize:14, outline:'none', fontFamily:'inherit', color:'#fff', boxSizing:'border-box' }} />
+        style={{ width:'100%', background:'#F4F5F6', border:'1.5px solid #E9E9EB', borderRadius:12, padding:12, fontSize:14, outline:'none', fontFamily:'inherit', color:'#1A1A1A', boxSizing:'border-box' }} />
     </div>
   )
 }
@@ -158,15 +158,15 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
   }
 
   const menus = [
-    { ico:'👛', label:'Wallet & Withdrawals', bg:'#1a1a1a', action:() => setTab && setTab('wallet') },
-    { ico:'🔔', label:'Notifications',      bg:'#1a1a1a', action:() => setTab && setTab('notifications') },
-    { ico:'🏆', label:'Rewards & Tiers',    bg:'#2d1a00', action:() => setTab && setTab('rewards') },
-    { ico:'📞', label:'Contact Info',      bg:'#1a3a1a', action:() => setModal('contact') },
-    { ico:'🛡️', label:'KYC Documents',     bg:'#1a1a3a', action:() => setModal('kyc') },
-    { ico:'💳', label:'Payment & Bank',    bg:'#1a1a1a', action:() => setModal('bank') },
-    { ico:'⚙️', label:'Settings',          bg:'#1a1a1a', action:() => setTab && setTab('settings') },
-    { ico:'⭐', label:'My Ratings',        bg:'#2d1a00', action:() => { setModal('ratings'); loadRatings() } },
-    { ico:'❓', label:'Help & Support',    bg:'#1a1a1a', action:() => setModal('help') },
+    { ico:'👛', label:'Wallet & Withdrawals', bg:'#F1F1F3', action:() => setTab && setTab('wallet') },
+    { ico:'🔔', label:'Notifications',      bg:'#F1F1F3', action:() => setTab && setTab('notifications') },
+    { ico:'🏆', label:'Rewards & Tiers',    bg:'#FFF7DA', action:() => setTab && setTab('rewards') },
+    { ico:'📞', label:'Contact Info',      bg:'#E7F7EE', action:() => setModal('contact') },
+    { ico:'🛡️', label:'KYC Documents',     bg:'#E8F0FE', action:() => setModal('kyc') },
+    { ico:'💳', label:'Payment & Bank',    bg:'#F1F1F3', action:() => setModal('bank') },
+    { ico:'⚙️', label:'Settings',          bg:'#F1F1F3', action:() => setTab && setTab('settings') },
+    { ico:'⭐', label:'My Ratings',        bg:'#FFF7DA', action:() => { setModal('ratings'); loadRatings() } },
+    { ico:'❓', label:'Help & Support',    bg:'#F1F1F3', action:() => setModal('help') },
   ]
 
   return (
@@ -190,26 +190,26 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
       {modal === 'kyc' && (
         <Modal title="🛡️ KYC Documents" onClose={() => setModal(null)}>
           {profile?.aadhar_verified && (
-            <div style={{ background:'#052e16', borderRadius:10, padding:'10px 14px', marginBottom:14, border:'1px solid #16a34a' }}>
-              <p style={{ color:'#4ade80', fontWeight:700, fontSize:13 }}>✅ Aadhaar Verified</p>
+            <div style={{ background:'#E7F7EE', borderRadius:10, padding:'10px 14px', marginBottom:14, border:'1px solid #0FA958' }}>
+              <p style={{ color:'#0FA958', fontWeight:700, fontSize:13 }}>✅ Aadhaar Verified</p>
             </div>
           )}
-          <p style={{ color:Y, fontWeight:700, fontSize:13, marginBottom:10 }}>Aadhaar Card *</p>
+          <p style={{ color:'#1A1A1A', fontWeight:700, fontSize:13, marginBottom:10 }}>Aadhaar Card *</p>
           {[['Front Side', aadharFront, setAadharFront], ['Back Side', aadharBack, setAadharBack]].map(([lbl, val, set]) => (
             <div key={lbl} style={{ marginBottom:12 }}>
-              <label style={{ fontSize:11, fontWeight:700, color:'#636366', display:'block', marginBottom:6, textTransform:'uppercase' }}>{lbl}</label>
+              <label style={{ fontSize:11, fontWeight:700, color:'#6B6B70', display:'block', marginBottom:6, textTransform:'uppercase' }}>{lbl}</label>
               <input type="file" accept="image/*" onChange={e => set(e.target.files[0])}
-                style={{ width:'100%', color:'#aaa', fontSize:13 }} />
+                style={{ width:'100%', color:'#6B6B70', fontSize:13 }} />
               {val && <p style={{ fontSize:11, color:GREEN, marginTop:4 }}>✓ {val.name}</p>}
             </div>
           ))}
           <Field label="Aadhaar Number" value={aadhaarNumber} onChange={setAadhaarNumber} placeholder="XXXX XXXX XXXX" />
 
-          <p style={{ color:Y, fontWeight:700, fontSize:13, marginBottom:10, marginTop:6 }}>PAN Card (Optional)</p>
+          <p style={{ color:'#1A1A1A', fontWeight:700, fontSize:13, marginBottom:10, marginTop:6 }}>PAN Card (Optional)</p>
           <div style={{ marginBottom:12 }}>
-            <label style={{ fontSize:11, fontWeight:700, color:'#636366', display:'block', marginBottom:6, textTransform:'uppercase' }}>PAN Photo</label>
+            <label style={{ fontSize:11, fontWeight:700, color:'#6B6B70', display:'block', marginBottom:6, textTransform:'uppercase' }}>PAN Photo</label>
             <input type="file" accept="image/*" onChange={e => setPanFront(e.target.files[0])}
-              style={{ width:'100%', color:'#aaa', fontSize:13 }} />
+              style={{ width:'100%', color:'#6B6B70', fontSize:13 }} />
             {panFront && <p style={{ fontSize:11, color:GREEN, marginTop:4 }}>✓ {panFront.name}</p>}
           </div>
           <Field label="PAN Number" value={panNumber} onChange={setPanNumber} placeholder="ABCDE1234F" />
@@ -224,12 +224,12 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
       {/* Bank Modal */}
       {modal === 'bank' && (
         <Modal title="💳 Payment & Bank Info" onClose={() => setModal(null)}>
-          <label style={{ fontSize:11, fontWeight:700, color:'#636366', display:'block', marginBottom:8, textTransform:'uppercase', letterSpacing:.5 }}>Preferred Payout Method *</label>
+          <label style={{ fontSize:11, fontWeight:700, color:'#6B6B70', display:'block', marginBottom:8, textTransform:'uppercase', letterSpacing:.5 }}>Preferred Payout Method *</label>
           <div style={{ display:'flex', gap:8, marginBottom:18 }}>
             {PAYOUT_OPTIONS.map(o => (
               <button key={o.code} onClick={() => setPayoutMethod(o.code)}
-                style={{ flex:1, padding:'12px 4px', borderRadius:12, border:'1.5px solid '+(payoutMethod===o.code?Y:'#2a2a2a'),
-                  background:payoutMethod===o.code?YL:'#111', color:payoutMethod===o.code?BK:'#888',
+                style={{ flex:1, padding:'12px 4px', borderRadius:12, border:'1.5px solid '+(payoutMethod===o.code?Y:'#E9E9EB'),
+                  background:payoutMethod===o.code?YL:'#F4F5F6', color:payoutMethod===o.code?BK:'#6B6B70',
                   fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
                 <span style={{ fontSize:20 }}>{o.ico}</span>{o.label}
               </button>
@@ -245,7 +245,7 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
             <Field label="Bank Name" value={bankName} onChange={setBankName} placeholder="HDFC Bank" />
           </>)}
           {payoutMethod === 'cash' && (
-            <p style={{ color:'#999', fontSize:13, background:'#111', border:'1px solid #2a2a2a', borderRadius:12, padding:'12px 14px', marginBottom:14 }}>
+            <p style={{ color:'#6B6B70', fontSize:13, background:'#F4F5F6', border:'1px solid #E9E9EB', borderRadius:12, padding:'12px 14px', marginBottom:14 }}>
               💵 You'll collect your earnings in cash. No bank details needed.
             </p>
           )}
@@ -260,20 +260,20 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
       {/* Help & Support Modal */}
       {modal === 'help' && (
         <Modal title="❓ Help & Support" onClose={() => setModal(null)}>
-          <p style={{ color:'#999', fontSize:13, marginBottom:16 }}>Our team is available 8 AM – 10 PM, 7 days a week.</p>
+          <p style={{ color:'#6B6B70', fontSize:13, marginBottom:16 }}>Our team is available 8 AM – 10 PM, 7 days a week.</p>
           {[
             ['📞', 'Call Support', supTel, 'tel:' + supTel],
             ['💬', 'WhatsApp', 'Chat with our team', 'https://wa.me/' + supWa + '?text=Hi+Kaam+Ready+Worker+Support'],
             ['📧', 'Email', supMail, 'mailto:' + supMail],
           ].map(([ico, label, sub, href]) => (
             <a key={label} href={href} target="_blank" rel="noopener noreferrer"
-              style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'#111', borderRadius:12, marginBottom:10, border:'1px solid #2a2a2a', textDecoration:'none' }}>
-              <div style={{ width:40, height:40, borderRadius:12, background:'#2a2a2a', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>{ico}</div>
+              style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'#F4F5F6', borderRadius:12, marginBottom:10, border:'1px solid #E9E9EB', textDecoration:'none' }}>
+              <div style={{ width:40, height:40, borderRadius:12, background:'#E9E9EB', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>{ico}</div>
               <div style={{ flex:1 }}>
-                <p style={{ fontWeight:700, fontSize:14, color:'#fff' }}>{label}</p>
-                <p style={{ fontSize:12, color:'#777', marginTop:2 }}>{sub}</p>
+                <p style={{ fontWeight:700, fontSize:14, color:'#1A1A1A' }}>{label}</p>
+                <p style={{ fontSize:12, color:'#6B6B70', marginTop:2 }}>{sub}</p>
               </div>
-              <span style={{ color:'#444', fontSize:18 }}>›</span>
+              <span style={{ color:'#9A9AA0', fontSize:18 }}>›</span>
             </a>
           ))}
         </Modal>
@@ -287,34 +287,34 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
         return (
           <Modal title="⭐ My Ratings" onClose={() => setModal(null)}>
             <div style={{ textAlign:'center', marginBottom:16 }}>
-              <p style={{ fontSize:42, fontWeight:900, color:Y, lineHeight:1 }}>{avg.toFixed(1)}</p>
-              <p style={{ fontSize:18, color:Y }}>{'★'.repeat(Math.round(avg))}{'☆'.repeat(5-Math.round(avg))}</p>
-              <p style={{ fontSize:12, color:'#777', marginTop:4 }}>{count} rating{count!==1?'s':''} from customers</p>
+              <p style={{ fontSize:42, fontWeight:900, color:'#B8900A', lineHeight:1 }}>{avg.toFixed(1)}</p>
+              <p style={{ fontSize:18, color:'#B8900A' }}>{'★'.repeat(Math.round(avg))}{'☆'.repeat(5-Math.round(avg))}</p>
+              <p style={{ fontSize:12, color:'#6B6B70', marginTop:4 }}>{count} rating{count!==1?'s':''} from customers</p>
             </div>
             <div style={{ marginBottom:16 }}>
               {dist.map(({s,n}) => (
                 <div key={s} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:5 }}>
-                  <span style={{ fontSize:12, color:'#aaa', width:28 }}>{s}★</span>
-                  <div style={{ flex:1, height:8, background:'#2a2a2a', borderRadius:4, overflow:'hidden' }}>
+                  <span style={{ fontSize:12, color:'#6B6B70', width:28 }}>{s}★</span>
+                  <div style={{ flex:1, height:8, background:'#E9E9EB', borderRadius:4, overflow:'hidden' }}>
                     <div style={{ width:(count? (n/count*100):0)+'%', height:'100%', background:Y }} />
                   </div>
-                  <span style={{ fontSize:12, color:'#777', width:24, textAlign:'right' }}>{n}</span>
+                  <span style={{ fontSize:12, color:'#6B6B70', width:24, textAlign:'right' }}>{n}</span>
                 </div>
               ))}
             </div>
-            <p style={{ color:Y, fontWeight:700, fontSize:13, marginBottom:10 }}>Recent Reviews</p>
+            <p style={{ color:'#1A1A1A', fontWeight:700, fontSize:13, marginBottom:10 }}>Recent Reviews</p>
             {ratingsLoading ? (
-              <p style={{ color:'#777', fontSize:13, textAlign:'center', padding:20 }}>Loading…</p>
+              <p style={{ color:'#6B6B70', fontSize:13, textAlign:'center', padding:20 }}>Loading…</p>
             ) : ratings.length === 0 ? (
-              <p style={{ color:'#777', fontSize:13, textAlign:'center', padding:20 }}>No ratings yet. Complete jobs to earn reviews ⭐</p>
+              <p style={{ color:'#6B6B70', fontSize:13, textAlign:'center', padding:20 }}>No ratings yet. Complete jobs to earn reviews ⭐</p>
             ) : ratings.map((r,i) => (
-              <div key={i} style={{ background:'#111', borderRadius:12, padding:'12px 14px', marginBottom:8, border:'1px solid #2a2a2a' }}>
+              <div key={i} style={{ background:'#F4F5F6', borderRadius:12, padding:'12px 14px', marginBottom:8, border:'1px solid #E9E9EB' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <span style={{ color:Y, fontSize:13 }}>{'★'.repeat(Math.round(r.rating))}{'☆'.repeat(5-Math.round(r.rating))}</span>
-                  <span style={{ fontSize:11, color:'#555' }}>{r.completed_at || r.created_at ? new Date(r.completed_at||r.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) : ''}</span>
+                  <span style={{ color:'#B8900A', fontSize:13 }}>{'★'.repeat(Math.round(r.rating))}{'☆'.repeat(5-Math.round(r.rating))}</span>
+                  <span style={{ fontSize:11, color:'#9A9AA0' }}>{r.completed_at || r.created_at ? new Date(r.completed_at||r.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) : ''}</span>
                 </div>
-                {r.review && <p style={{ color:'#ccc', fontSize:13, marginTop:6 }}>"{r.review}"</p>}
-                <p style={{ color:'#555', fontSize:11, marginTop:6 }}>{r.customer_name || 'Customer'} · {r.service || ''}</p>
+                {r.review && <p style={{ color:'#3A3A3E', fontSize:13, marginTop:6 }}>"{r.review}"</p>}
+                <p style={{ color:'#9A9AA0', fontSize:11, marginTop:6 }}>{r.customer_name || 'Customer'} · {r.service || ''}</p>
               </div>
             ))}
           </Modal>
@@ -340,15 +340,15 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
         return (
           <Modal title="🏆 Achievements" onClose={() => setModal(null)}>
             <div style={{ textAlign:'center', marginBottom:16 }}>
-              <p style={{ fontSize:32, fontWeight:900, color:Y }}>{earnedCount}/{badges.length}</p>
-              <p style={{ fontSize:12, color:'#777' }}>badges earned</p>
+              <p style={{ fontSize:32, fontWeight:900, color:'#B8900A' }}>{earnedCount}/{badges.length}</p>
+              <p style={{ fontSize:12, color:'#6B6B70' }}>badges earned</p>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
               {badges.map(b => (
-                <div key={b.title} style={{ background: b.earned ? '#2d2400' : '#141414', borderRadius:14, padding:'14px 12px', border:'1px solid '+(b.earned?Y:'#2a2a2a'), textAlign:'center', opacity:b.earned?1:0.55 }}>
+                <div key={b.title} style={{ background: b.earned ? '#FFF7DA' : '#F4F5F6', borderRadius:14, padding:'14px 12px', border:'1px solid '+(b.earned?Y:'#E9E9EB'), textAlign:'center', opacity:b.earned?1:0.55 }}>
                   <div style={{ fontSize:30, marginBottom:6, filter: b.earned?'none':'grayscale(1)' }}>{b.ico}</div>
-                  <p style={{ fontSize:13, fontWeight:800, color: b.earned?Y:'#888' }}>{b.title}</p>
-                  <p style={{ fontSize:10, color:'#666', marginTop:3 }}>{b.desc}</p>
+                  <p style={{ fontSize:13, fontWeight:800, color: b.earned?Y:'#6B6B70' }}>{b.title}</p>
+                  <p style={{ fontSize:10, color:'#6B6B70', marginTop:3 }}>{b.desc}</p>
                   {b.earned && <p style={{ fontSize:10, color:GREEN, marginTop:6, fontWeight:700 }}>✓ Earned</p>}
                 </div>
               ))}
@@ -358,28 +358,28 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
       })()}
 
       {/* Profile Header */}
-      <div style={{ background:'#1a1a1a', borderRadius:20, padding:20, border:'1px solid #2a2a2a', textAlign:'center' }}>
+      <div style={{ background:'#FFFFFF', borderRadius:20, padding:20, border:'1px solid #E9E9EB', textAlign:'center' }}>
         <AvatarUpload userId={user?.id} currentUrl={profile?.avatar_url} table="workers" onUploaded={() => reloadProfile?.()} />
-        <p style={{ fontWeight:800, fontSize:18, color:'#fff', marginTop:10 }}>{profile?.name || 'Worker'}</p>
-        <p style={{ fontSize:13, color:'#555', marginTop:3 }}>{profile?.skill || 'Skilled Worker'} • {profile?.city || 'Karnataka'}</p>
-        {profile?.phone && <p style={{ fontSize:13, color:'#444', marginTop:2 }}>{profile.phone}</p>}
-        {profile?.email && <p style={{ fontSize:12, color:'#444', marginTop:1 }}>{profile.email}</p>}
+        <p style={{ fontWeight:800, fontSize:18, color:'#1A1A1A', marginTop:10 }}>{profile?.name || 'Worker'}</p>
+        <p style={{ fontSize:13, color:'#9A9AA0', marginTop:3 }}>{profile?.skill || 'Skilled Worker'} • {profile?.city || 'Karnataka'}</p>
+        {profile?.phone && <p style={{ fontSize:13, color:'#9A9AA0', marginTop:2 }}>{profile.phone}</p>}
+        {profile?.email && <p style={{ fontSize:12, color:'#9A9AA0', marginTop:1 }}>{profile.email}</p>}
 
         <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:14, flexWrap:'wrap' }}>
           <span style={{ background:YL, color:YD, fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8 }}>
             ⭐ {profile?.rating || 5.0} Rating
           </span>
-          <span style={{ background:'#1a2e1a', color:GREEN, fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8 }}>
+          <span style={{ background:'#E7F7EE', color:GREEN, fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8 }}>
             {profile?.total_jobs || 0} Jobs
           </span>
-          <span style={{ background: profile?.is_online ? '#1a2e1a' : '#2a2a2a', color: profile?.is_online ? GREEN : '#555', fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8 }}>
+          <span style={{ background: profile?.is_online ? '#E7F7EE' : '#E9E9EB', color: profile?.is_online ? GREEN : '#9A9AA0', fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8 }}>
             {profile?.is_online ? '🟢 Online' : '⚫ Offline'}
           </span>
         </div>
 
         {/* KYC warning */}
         {!profile?.aadhar_submitted && (
-          <div style={{ background:'#2d1a00', borderRadius:10, padding:'10px 14px', marginTop:14, border:'1px solid #f59e0b' }}
+          <div style={{ background:'#FFF7DA', borderRadius:10, padding:'10px 14px', marginTop:14, border:'1px solid #f59e0b' }}
             onClick={() => setModal('kyc')}>
             <p style={{ color:'#f59e0b', fontWeight:700, fontSize:12 }}>⚠️ KYC pending — tap to submit Aadhaar</p>
           </div>
@@ -390,22 +390,22 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
         {[['Wallet','₹'+(profile?.wallet_balance||0).toLocaleString('en-IN'),GREEN],
           ['Trust Score',(profile?.trust_score||100)+'%',Y],
-          ['Credit','₹'+(profile?.credit_balance||0),('#60a5fa')]].map(([l,v,c]) => (
-          <div key={l} style={{ background:'#1a1a1a', borderRadius:14, padding:'12px 10px', border:'1px solid #2a2a2a', textAlign:'center' }}>
+          ['Credit','₹'+(profile?.credit_balance||0),('#2563EB')]].map(([l,v,c]) => (
+          <div key={l} style={{ background:'#FFFFFF', borderRadius:14, padding:'12px 10px', border:'1px solid #E9E9EB', textAlign:'center' }}>
             <p style={{ color:c, fontWeight:900, fontSize:16 }}>{v}</p>
-            <p style={{ color:'#555', fontSize:10, marginTop:3 }}>{l}</p>
+            <p style={{ color:'#9A9AA0', fontSize:10, marginTop:3 }}>{l}</p>
           </div>
         ))}
       </div>
 
       {/* Language */}
-      <div style={{ background:'#1a1a1a', borderRadius:20, border:'1px solid #2a2a2a', padding:16 }}>
-        <p style={{ color:Y, fontWeight:800, fontSize:14, marginBottom:12 }}>🌐 {t('Language')}</p>
+      <div style={{ background:'#FFFFFF', borderRadius:20, border:'1px solid #E9E9EB', padding:16 }}>
+        <p style={{ color:'#1A1A1A', fontWeight:800, fontSize:14, marginBottom:12 }}>🌐 {t('Language')}</p>
         <div style={{ display:'flex', gap:8 }}>
           {LANGS.map(L => (
             <button key={L.code} onClick={() => changeLang(L.code)}
-              style={{ flex:1, padding:'12px 0', borderRadius:12, border:'1.5px solid '+(lang===L.code?Y:'#2a2a2a'),
-                background:lang===L.code?YL:'#111', color:lang===L.code?BK:'#888', fontWeight:700, fontSize:13,
+              style={{ flex:1, padding:'12px 0', borderRadius:12, border:'1.5px solid '+(lang===L.code?Y:'#E9E9EB'),
+                background:lang===L.code?YL:'#F4F5F6', color:lang===L.code?BK:'#6B6B70', fontWeight:700, fontSize:13,
                 cursor:'pointer', fontFamily:'inherit' }}>
               {L.label}
             </button>
@@ -414,22 +414,22 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
       </div>
 
       {/* Menu */}
-      <div style={{ background:'#1a1a1a', borderRadius:20, border:'1px solid #2a2a2a', overflow:'hidden' }}>
+      <div style={{ background:'#FFFFFF', borderRadius:20, border:'1px solid #E9E9EB', overflow:'hidden' }}>
         {menus.map(({ ico, label, bg, action }) => (
           <div key={label} onClick={action}
-            style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderBottom:'1px solid #222', cursor:'pointer' }}>
+            style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderBottom:'1px solid #F2F2F4', cursor:'pointer' }}>
             <div style={{ width:36, height:36, borderRadius:10, background:bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>{ico}</div>
-            <span style={{ fontSize:15, fontWeight:500, flex:1, color:'#fff' }}>{label}</span>
-            <span style={{ color:'#333', fontSize:18 }}>›</span>
+            <span style={{ fontSize:15, fontWeight:500, flex:1, color:'#1A1A1A' }}>{label}</span>
+            <span style={{ color:'#C6C6C9', fontSize:18 }}>›</span>
           </div>
         ))}
       </div>
 
       <button onClick={signOut} disabled={signingOut}
-        style={{ width:'100%', background:'transparent', border:'1.5px solid #dc2626', borderRadius:14, padding:15, color:'#ef4444', fontWeight:700, fontSize:15, cursor:'pointer', fontFamily:'inherit', opacity:signingOut?0.6:1 }}>
+        style={{ width:'100%', background:'transparent', border:'1.5px solid #E5484D', borderRadius:14, padding:15, color:'#E5484D', fontWeight:700, fontSize:15, cursor:'pointer', fontFamily:'inherit', opacity:signingOut?0.6:1 }}>
         {signingOut ? 'Signing out...' : '🚪 Sign Out'}
       </button>
-      <p style={{ textAlign:'center', fontSize:11, color:'#333', paddingBottom:8 }}>Kaam Ready v2.0 — Karnataka 🇮🇳</p>
+      <p style={{ textAlign:'center', fontSize:11, color:'#C6C6C9', paddingBottom:8 }}>Kaam Ready v2.0 — Karnataka 🇮🇳</p>
     </div>
     </div>
   )

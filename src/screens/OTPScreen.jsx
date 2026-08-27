@@ -74,22 +74,22 @@ export default function OTPScreen({ setScreen, showToast }) {
   }
 
   return (
-    <div style={{ height:'100vh', background:'#0A0A0A', maxWidth:430, margin:'0 auto', width:'100%', display:'flex', flexDirection:'column' }}>
+    <div style={{ height:'100vh', background:'#F4F5F6', maxWidth:430, margin:'0 auto', width:'100%', display:'flex', flexDirection:'column' }}>
       <div style={{ background:Y, padding:'16px 24px 20px' }}>
         <button onClick={() => setScreen('login')} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer' }}>←</button>
         <h2 style={{ fontWeight:800, fontSize:20, marginTop:8 }}>Enter OTP</h2>
         <p style={{ fontSize:13, color:'rgba(0,0,0,.6)' }}>6-digit code sent to +91 {sessionStorage.getItem('kr_worker_phone') || '••••••••••'}</p>
       </div>
       <div style={{ padding:24, flex:1 }}>
-        <div style={{ background:'#111', borderRadius:20, padding:20, border:'1px solid #222' }}>
+        <div style={{ background:'#FFFFFF', borderRadius:20, padding:20, border:'1px solid #E9E9EB', boxShadow:'0 1px 3px rgba(16,24,40,.06)' }}>
           <div style={{ display:'flex', gap:8, justifyContent:'center', margin:'8px 0 16px' }}>
             {otp.map((v,i) => (
               <input key={i} id={'wo'+i} maxLength={1} inputMode="numeric" value={v}
                 onChange={e => handleKey(i, e.target.value)}
                 onKeyDown={e => { if (e.key==='Backspace' && !v && i>0) document.getElementById('wo'+(i-1))?.focus() }}
-                style={{ width:46, height:54, border:'2px solid #2a2a2a', borderRadius:12,
+                style={{ width:46, height:54, border:'2px solid #E9E9EB', borderRadius:12,
                   textAlign:'center', fontSize:22, fontWeight:700, outline:'none',
-                  fontFamily:'inherit', background:'#1a1a1a', color:'#fff' }} />
+                  fontFamily:'inherit', background:'#FAFAFA', color:'#1A1A1A' }} />
             ))}
           </div>
           <button onClick={verify} disabled={busy}
@@ -98,9 +98,9 @@ export default function OTPScreen({ setScreen, showToast }) {
           </button>
           <div style={{ textAlign:'center', marginTop:14 }}>
             {cooldown > 0
-              ? <p style={{ fontSize:13, color:'#555' }}>Resend OTP in {cooldown}s</p>
+              ? <p style={{ fontSize:13, color:'#9A9AA0' }}>Resend OTP in {cooldown}s</p>
               : <button onClick={resendOTP} disabled={resending}
-                  style={{ background:'none', border:'none', color:Y, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                  style={{ background:'none', border:'none', color:'#B8900A', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
                   {resending ? 'Sending...' : 'Resend OTP'}
                 </button>
             }

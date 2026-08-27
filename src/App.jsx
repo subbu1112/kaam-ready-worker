@@ -2,6 +2,7 @@ import { useState, useEffect, lazy, Suspense, Component } from 'react'
 import OneSignal from 'react-onesignal'
 import { sb } from './lib/supabase'
 import TabBar  from './components/TabBar'
+import { C } from './theme'
 import Toast   from './components/Toast'
 import TermsModal, { termsAccepted, acceptTerms } from './components/TermsModal'
 
@@ -43,12 +44,12 @@ class TabErrorBoundary extends Component {
   render() {
     if (this.state.error) {
       return (
-        <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:32 }}>
+        <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:32, background:C.page }}>
           <p style={{ fontSize:32, marginBottom:12 }}>⚠️</p>
-          <p style={{ color:'#fff', fontWeight:800, fontSize:16, marginBottom:8, textAlign:'center' }}>Something went wrong</p>
-          <p style={{ color:'#555', fontSize:12, textAlign:'center', marginBottom:20 }}>{this.state.error?.message || 'Unknown error'}</p>
+          <p style={{ color:C.text, fontWeight:800, fontSize:16, marginBottom:8, textAlign:'center' }}>Something went wrong</p>
+          <p style={{ color:C.text3, fontSize:12, textAlign:'center', marginBottom:20 }}>{this.state.error?.message || 'Unknown error'}</p>
           <button onClick={() => this.setState({ error: null })}
-            style={{ background:'#F5C000', border:'none', borderRadius:12, padding:'12px 24px', fontWeight:800, cursor:'pointer', fontFamily:'inherit' }}>
+            style={{ background:C.yellow, border:'none', borderRadius:12, padding:'12px 24px', fontWeight:800, cursor:'pointer', fontFamily:'inherit' }}>
             Try Again
           </button>
         </div>
@@ -60,8 +61,8 @@ class TabErrorBoundary extends Component {
 
 function PageLoader() {
   return (
-    <div style={{ height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#111' }}>
-      <div style={{ width:36, height:36, border:'3px solid #333', borderTop:'3px solid #F5C000', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+    <div style={{ height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:C.page }}>
+      <div style={{ width:36, height:36, border:'3px solid '+C.line, borderTop:'3px solid '+C.yellow, borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
@@ -133,7 +134,7 @@ export default function App() {
           position:'fixed', top:0, bottom:0, left:'50%', transform:'translateX(-50%)',
           width:'100%', maxWidth:430,
           display:'flex', flexDirection:'column',
-          background:'#111', overflow:'hidden',
+          background:C.page, overflow:'hidden',
         }}>
           {showTerms && <TermsModal onAccept={() => { acceptTerms(); setShowTerms(false) }} />}
           <TabErrorBoundary>

@@ -4,14 +4,14 @@ export function termsAccepted() { try { return localStorage.getItem(TERMS_KEY) =
 export function acceptTerms()   { try { localStorage.setItem(TERMS_KEY, '1') } catch { /* storage blocked */ } }
 
 export default function TermsModal({ onAccept, dark = false }) {
-  const bg   = dark ? '#111' : '#fff'
+  const bg   = dark ? '#F4F5F6' : '#fff'
   const text = dark ? '#fff' : '#000'
-  const sub  = dark ? '#555' : '#888'
-  const bdr  = dark ? '#222' : '#f0f0f0'
+  const sub  = dark ? '#9A9AA0' : '#6B6B70'
+  const bdr  = dark ? '#E9E9EB' : '#E9E9EB'
   const Y    = '#F5C000'
 
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.75)', zIndex:9999,
+    <div style={{ position:'fixed', inset:0, background:'rgba(16,24,40,.45)', zIndex:9999,
       display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
       <div style={{ background:bg, borderRadius:'24px 24px 0 0', width:'100%', maxWidth:430,
         padding:'24px 24px 40px', maxHeight:'80vh', display:'flex', flexDirection:'column' }}>
@@ -20,7 +20,7 @@ export default function TermsModal({ onAccept, dark = false }) {
           <p style={{ fontWeight:800, fontSize:20, color:text }}>Before you continue</p>
           <p style={{ fontSize:13, color:sub, marginTop:6 }}>Please read and accept our Terms & Privacy Policy</p>
         </div>
-        <div style={{ flex:1, overflowY:'auto', background:dark?'#0a0a0a':'#f9f9f9',
+        <div style={{ flex:1, overflowY:'auto', background:dark?'#0a0a0a':'#FAFAFA',
           borderRadius:14, padding:'16px', marginBottom:16, fontSize:13, color:sub, lineHeight:1.7 }}>
           <p style={{ fontWeight:700, color:text, marginBottom:8 }}>Terms of Service</p>
           <p>Kaam Ready is a platform that connects customers with skilled workers in Karnataka. By using the app you agree to:</p>

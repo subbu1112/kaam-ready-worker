@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { sb } from '../lib/supabase'
 import MapView from '../components/MapView'
-import { floorFor, COMMISSION, EMPTY_BREAKDOWN, breakdownTotal, workerShare } from '../constants'
+import { floorFor, EMPTY_BREAKDOWN, breakdownTotal, workerShare } from '../constants'
 import { t } from '../i18n'
-const Y='#F5C000',YL='#FFF8D6',GREEN='#22c55e',RED='#ef4444'
+import { C, card, scroller, btnPrimary, btnGreen, input, label } from '../theme'
+import { Pill } from '../components/UI'
+
 export default function HomeScreen({ user, profile, showToast, setTab }) {
   const [online,    setOnline]    = useState(() => { try { return localStorage.getItem('kr_worker_online') === 'true' } catch { return false } })
   const [jobAlert,  setJobAlert]  = useState(null)
@@ -12,11 +14,12 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
   const [todayJobs, setTodayJobs] = useState(0)
   const [otpOpen,   setOtpOpen]   = useState(false)   // customer-OTP entry panel open
   const [otpInput,  setOtpInput]  = useState('')
-  const [bd,        setBd]        = useState(EMPTY_BREAKDOWN) // price breakdown: labor/material/additional/note
+  const [bd,        setBd]        = useState(EMPTY_BREAKDOWN) // labor/material/additional/note
   const [busy,      setBusy]      = useState(false)
   const [upcoming,  setUpcoming]  = useState([])
   const [schedAvail,setSchedAvail]= useState([])
   const [photoBusy, setPhotoBusy] = useState(null)
+  const [demand,    setDemand]    = useState(false)   // "high demand areas" hint
   const timer=useRef(null), chan=useRef(null), jobChan=useRef(null)
 
   useEffect(() => { if(profile) loadTodayStats() }, [profile])
@@ -72,8 +75,7 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
   }, [activeJob?.id])
 
   // Ring + vibrate for 3 seconds whenever a new job request arrives, so the
-  // worker notices even if the phone is in their pocket. Pure Web Audio (no
-  // asset needed); guarded so it can never crash the screen.
+  // worker notices even if the phone is in their pocket.
   useEffect(() => {
     if (!jobAlert?.id) return
     let ctx, iv, to, closed = false
@@ -92,11 +94,11 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
             const o = ctx.createOscillator(), g = ctx.createGain()
             o.type = 'sine'; o.frequency.value = freq
             o.connect(g); g.connect(ctx.destination)
-            const t = ctx.currentTime + i * 0.18
-            g.gain.setValueAtTime(0.0001, t)
-            g.gain.exponentialRampToValueAtTime(0.5, t + 0.02)
-            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16)
-            o.start(t); o.stop(t + 0.18)
+            const tm = ctx.currentTime + i * 0.18
+            g.gain.setValueAtTime(0.0001, tm)
+            g.gain.exponentialRampToValueAtTime(0.5, tm + 0.02)
+            g.gain.exponentialRampToValueAtTime(0.0001, tm + 0.16)
+            o.start(tm); o.stop(tm + 0.18)
           })
         }
         beep()
@@ -120,9 +122,9 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
 
   function kmBetween(lat1,lng1,lat2,lng2) {
     if (!lat1||!lng1||!lat2||!lng2) return null
-    const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLng=(lng2-lng1)*Math.PI/180
+    const Rk=6371, dLat=(lat2-lat1)*Math.PI/180, dLng=(lng2-lng1)*Math.PI/180
     const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
-    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
+    return Rk*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
   }
 
   // The worker's trade(s): primary skill + any extra skills (multi-skilled).
@@ -134,8 +136,6 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
   }
   // Emergency jobs are urgent and broadcast to EVERY worker, regardless of trade.
   const isEmergency = b => b?.service_id === 'emerg'
-  // A job only matches if its service is one the worker is skilled in —
-  // except emergencies, which are offered to all workers.
   function matchesSkill(b) {
     if (isEmergency(b)) return true     // 🚨 emergency → reaches every worker
     const ids = mySkillIds()
@@ -230,11 +230,8 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
     const pos = await getPosition()
     if (pos) sb.from('workers').update({ lat: pos.lat, lng: pos.lng }).eq('id', user.id).then(()=>{})
     // phone travels inside the customer's own booking row (RLS-protected)
-    // instead of the public workers directory.
     const w={id:user.id,name:profile?.name,phone:profile?.phone,skill:profile?.skill,rating:profile?.rating,jobs:profile?.total_jobs,ico:'👷',eta:'8 min',dist:'1.0 km',lat:pos?.lat,lng:pos?.lng}
     // Atomic claim: only succeeds if still open AND this worker is allowed (RLS).
-    // .select() returns the row only if the write actually persisted — so we never
-    // show "accepted" locally while the database (and the customer) stay unchanged.
     const { data, error } = await sb.from('bookings')
       .update({ status:'assigned', worker_id:user.id, worker:w })
       .eq('id', jobAlert.id).eq('status','searching').is('worker_id', null)
@@ -260,9 +257,7 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
 
   function jobFloor(job) { return floorFor(job?.service_id) }
 
-  // STEP 1 — Customer OTP verification. The customer reads a 4-digit code from
-  // their app; the worker enters it here. Only on a match is the job marked
-  // complete and the price-setting form unlocked.
+  // STEP 1 — Customer OTP verification.
   async function verifyOtp() {
     if (!activeJob || busy) return
     const entered = otpInput.replace(/\D/g, '').trim()
@@ -281,9 +276,7 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
     showToast('OTP verified ✓ Job complete — now set your final price')
   }
 
-  // STEP 2 — Detailed price quotation. Worker enters labour + material +
-  // additional charges; total must respect the category floor. Sent to the
-  // customer to Accept / Modify before paying.
+  // STEP 2 — Detailed price quotation.
   async function submitQuote() {
     if (!activeJob || busy) return
     const labor = parseInt(bd.labor, 10) || 0
@@ -307,132 +300,192 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
     showToast('Quotation sent — waiting for customer to accept & pay 💳')
   }
 
-  function toggleOnline() { const next=!online; setOnline(next); showToast(next?'You are now Online 🟢':'You are now Offline') }
+  function toggleOnline() { const next=!online; setOnline(next); showToast(next?'You are now On Duty 🟢':'You are now Off Duty') }
 
   const bookingRef = activeJob?.id ? '#KR-' + activeJob.id.slice(0,8).toUpperCase() : null
-  // 'pending' = booking created, worker not yet priced — treat same as null (no payment started)
+  // 'pending' = booking created, worker not yet priced — treat same as no payment
   const paymentStarted = ps => ps && ps !== 'pending'
 
+  const KV = ({ k, v }) => (
+    <div style={{ display:'flex', justifyContent:'space-between', gap:12, padding:'9px 0', borderBottom:`1px solid ${C.lineSoft}` }}>
+      <span style={{ fontSize:13, color:C.text3, flexShrink:0 }}>{k}</span>
+      <span style={{ fontSize:13, fontWeight:600, color:C.text, maxWidth:'62%', textAlign:'right' }}>{v}</span>
+    </div>
+  )
+
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <div style={{ background:online?GREEN:'#1C1C1E', padding:'10px 20px 6px', display:'flex', justifyContent:'space-between', transition:'background .3s' }}>
-        <span style={{ color:'#fff', fontSize:12, fontWeight:700 }}>Kaam Ready</span>
-        <span style={{ color:'#fff', fontSize:11, fontWeight:800 }}>{online?'● '+t('ONLINE'):'● '+t('OFFLINE')}</span>
-        <span onClick={() => setTab && setTab('notifications')} style={{ color:'#fff', fontSize:14, cursor:'pointer' }}>🔔</span>
-      </div>
-      <div style={{ background:'#1C1C1E', padding:'10px 20px 16px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <img src="/icon-192.png" alt="Kaam Ready" style={{ width:36, height:36, borderRadius:9 }} />
-          <div>
-            <h1 style={{ color:Y, fontSize:20, fontWeight:800 }}>Kaam Ready</h1>
-            <p style={{ color:'#636366', fontSize:12 }}>{profile?.skill} · {profile?.city}</p>
-          </div>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', background:C.page }}>
+
+      {/* ── Black duty bar: ON/OFF DUTY pill, like the reference ── */}
+      <div style={{ background:C.nav, padding:'12px 14px', display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
+        <img src="/icon-192.png" alt="" style={{ width:28, height:28, borderRadius:8 }} />
+        <div onClick={toggleOnline}
+          style={{ display:'flex', alignItems:'center', gap:9, background:'#fff', borderRadius:999,
+            padding:'5px 12px 5px 8px', cursor:'pointer', flexShrink:0 }}>
+          <span style={{ width:34, height:19, borderRadius:999, background: online ? C.green : '#C9C9CE',
+            position:'relative', transition:'background .2s', flexShrink:0, display:'inline-block' }}>
+            <span style={{ position:'absolute', top:2.5, left: online ? 17.5 : 2.5, width:14, height:14,
+              borderRadius:'50%', background:'#fff', transition:'left .2s' }} />
+          </span>
+          <span style={{ fontSize:11.5, fontWeight:800, letterSpacing:.4, color: online ? C.green : C.text2 }}>
+            {online ? 'ON DUTY' : 'OFF DUTY'}
+          </span>
         </div>
-        <div onClick={toggleOnline} style={{ width:52, height:28, borderRadius:20, background:online?GREEN:'#3A3A3C', position:'relative', cursor:'pointer', transition:'background .2s' }}>
-          <div style={{ width:22, height:22, background:'#fff', borderRadius:'50%', position:'absolute', top:3, left:online?27:3, transition:'left .2s', boxShadow:'0 1px 4px rgba(0,0,0,.3)' }} />
-        </div>
+        <div style={{ flex:1 }} />
+        <span onClick={() => setTab && setTab('notifications')} style={{ fontSize:17, cursor:'pointer' }}>🔔</span>
       </div>
 
-      <div style={{ flex:1, minHeight:0, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:12 }}>
+      {/* ── Today's earnings strip ── */}
+      <div onClick={() => setTab && setTab('earnings')}
+        style={{ background:C.navSoft, padding:'11px 16px', display:'flex', alignItems:'center',
+          justifyContent:'space-between', cursor:'pointer', flexShrink:0 }}>
+        <span style={{ color:C.onDark2, fontSize:12, fontWeight:600 }}>Today's Earnings</span>
+        <span style={{ color:'#fff', fontSize:15, fontWeight:800 }}>
+          ₹{Math.round(todayEarn * 0.9).toLocaleString('en-IN')}
+          <span style={{ fontSize:11, fontWeight:600, color:C.onDark2, marginLeft:6 }}>▾</span>
+        </span>
+      </div>
+
+      <div style={{ ...scroller, padding:14, display:'flex', flexDirection:'column', gap:12 }}>
+
+        {/* ── Map + high-demand toggle (when no active job) ── */}
+        {!activeJob && (
+          <div style={{ ...card, overflow:'hidden' }}>
+            <MapView workerLat={profile?.lat} workerLng={profile?.lng}
+              customerLat={profile?.lat} customerLng={profile?.lng}
+              style={{ height:190, borderRadius:0 }} />
+            <div style={{ padding:'12px 14px', display:'flex', alignItems:'center', gap:12, borderTop:`1px solid ${C.line}` }}>
+              <div style={{ flex:1 }}>
+                <p style={{ fontSize:13.5, fontWeight:700, color:C.text }}>High demand areas</p>
+                <p style={{ fontSize:11.5, color:C.text3, marginTop:2 }}>Turn on to see where jobs are booking now</p>
+              </div>
+              <div onClick={() => { setDemand(v => !v); showToast(demand ? 'Demand view off' : 'Showing high demand areas 🔥') }}
+                style={{ width:44, height:25, borderRadius:999, background: demand ? C.green : '#D6D6D9',
+                  position:'relative', cursor:'pointer', transition:'background .2s', flexShrink:0 }}>
+                <div style={{ width:19, height:19, background:'#fff', borderRadius:'50%', position:'absolute',
+                  top:3, left: demand ? 22 : 3, transition:'left .2s', boxShadow:'0 1px 3px rgba(0,0,0,.2)' }} />
+              </div>
+            </div>
+            {demand && (
+              <div style={{ background:C.amberL, padding:'10px 14px', borderTop:`1px solid ${C.line}` }}>
+                <p style={{ fontSize:12, color:'#92400E', fontWeight:600 }}>
+                  🔥 {profile?.city || 'Your city'} — most bookings come in between 9–11 AM and 6–9 PM.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Duty status card ── */}
         {!online && !activeJob && (
-          <div style={{ background:'#111', borderRadius:20, padding:'28px 24px', textAlign:'center', border:'1.5px dashed #2a2a2a' }}>
-            <div style={{ fontSize:44, marginBottom:12 }}>😴</div>
-            <p style={{ fontWeight:800, fontSize:16, color:'#fff' }}>{t('You are Offline')}</p>
-            <p style={{ fontSize:13, color:'#555', margin:'6px 0 18px' }}>{t('Toggle the switch above to start receiving jobs')}</p>
-            <button onClick={toggleOnline} style={{ background:Y, border:'none', borderRadius:14, padding:'14px 28px', fontWeight:800, fontSize:14, cursor:'pointer' }}>{t('Go Online Now')}</button>
+          <div style={{ ...card, padding:'26px 22px', textAlign:'center' }}>
+            <div style={{ fontSize:40, marginBottom:10 }}>😴</div>
+            <p style={{ fontWeight:800, fontSize:16, color:C.text }}>{t('You are Offline')}</p>
+            <p style={{ fontSize:13, color:C.text3, margin:'6px 0 16px' }}>{t('Toggle the switch above to start receiving jobs')}</p>
+            <button onClick={toggleOnline} style={{ ...btnPrimary, width:'auto', padding:'13px 26px' }}>{t('Go Online Now')}</button>
           </div>
         )}
         {online && !jobAlert && !activeJob && (
-          <div style={{ background:'#111', border:'1.5px solid '+Y, borderRadius:20, padding:'28px 24px', textAlign:'center' }}>
-            <div style={{ fontSize:44, marginBottom:12 }}>🟢</div>
-            <p style={{ fontWeight:800, fontSize:16, color:'#fff' }}>{t('Waiting for jobs...')}</p>
-            <p style={{ fontSize:13, color:'#636366', marginTop:6 }}>{t("You'll be notified instantly when a job matches")}</p>
+          <div style={{ ...card, padding:'26px 22px', textAlign:'center', border:`1.5px solid ${C.green}` }}>
+            <div style={{ fontSize:40, marginBottom:10 }}>🟢</div>
+            <p style={{ fontWeight:800, fontSize:16, color:C.text }}>{t('Waiting for jobs...')}</p>
+            <p style={{ fontSize:13, color:C.text3, marginTop:6 }}>{t("You'll be notified instantly when a job matches")}</p>
           </div>
         )}
+
+        {/* ── Scheduled work ── */}
         {online && upcoming.length>0 && (
-          <div style={{ background:'#111', border:'1.5px solid #5B21B6', borderRadius:20, padding:16 }}>
-            <p style={{ color:'#a78bfa', fontWeight:800, fontSize:14, marginBottom:10 }}>📅 {t('Upcoming Jobs')}</p>
+          <div style={{ ...card, padding:14 }}>
+            <p style={{ color:C.purple, fontWeight:800, fontSize:13.5, marginBottom:6 }}>📅 {t('Upcoming Jobs')}</p>
             {upcoming.map(b => (
-              <div key={b.id} style={{ borderTop:'1px solid #1a1a1a', padding:'10px 0' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <div>
-                    <p style={{ color:'#fff', fontSize:13, fontWeight:700 }}>{b.service} · {b.customer_name||''}</p>
-                    <p style={{ color:'#636366', fontSize:11, marginTop:2 }}>{new Date(b.scheduled_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})} · {b.address}</p>
-                  </div>
-                  <button onClick={() => setActiveJob(b)}
-                    style={{ background:Y, border:'none', borderRadius:10, padding:'8px 14px', fontWeight:800, fontSize:12, cursor:'pointer', flexShrink:0 }}>{t('Start Job')}</button>
+              <div key={b.id} style={{ borderTop:`1px solid ${C.lineSoft}`, padding:'11px 0',
+                display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
+                <div style={{ minWidth:0 }}>
+                  <p style={{ color:C.text, fontSize:13.5, fontWeight:700 }}>{b.service} · {b.customer_name||''}</p>
+                  <p style={{ color:C.text3, fontSize:11.5, marginTop:2 }}>{new Date(b.scheduled_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})} · {b.address}</p>
                 </div>
+                <button onClick={() => setActiveJob(b)}
+                  style={{ ...btnPrimary, width:'auto', padding:'9px 15px', fontSize:12.5, flexShrink:0 }}>{t('Start Job')}</button>
               </div>
             ))}
           </div>
         )}
         {online && !activeJob && schedAvail.length>0 && (
-          <div style={{ background:'#111', border:'1.5px dashed #5B21B6', borderRadius:20, padding:16 }}>
-            <p style={{ color:'#a78bfa', fontWeight:800, fontSize:14, marginBottom:10 }}>📅 {t('Scheduled Jobs Available')}</p>
+          <div style={{ ...card, padding:14, border:`1.5px dashed ${C.purple}` }}>
+            <p style={{ color:C.purple, fontWeight:800, fontSize:13.5, marginBottom:6 }}>📅 {t('Scheduled Jobs Available')}</p>
             {schedAvail.map(b => (
-              <div key={b.id} style={{ borderTop:'1px solid #1a1a1a', padding:'10px 0', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <div>
-                  <p style={{ color:'#fff', fontSize:13, fontWeight:700 }}>{b.service}</p>
-                  <p style={{ color:'#636366', fontSize:11, marginTop:2 }}>{new Date(b.scheduled_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</p>
+              <div key={b.id} style={{ borderTop:`1px solid ${C.lineSoft}`, padding:'11px 0',
+                display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
+                <div style={{ minWidth:0 }}>
+                  <p style={{ color:C.text, fontSize:13.5, fontWeight:700 }}>{b.service}</p>
+                  <p style={{ color:C.text3, fontSize:11.5, marginTop:2 }}>{new Date(b.scheduled_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</p>
                 </div>
                 <button onClick={() => acceptScheduled(b)}
-                  style={{ background:'#22c55e', color:'#fff', border:'none', borderRadius:10, padding:'8px 14px', fontWeight:800, fontSize:12, cursor:'pointer', flexShrink:0 }}>✓ {t('Accept')}</button>
+                  style={{ ...btnGreen, width:'auto', padding:'9px 15px', fontSize:12.5, flexShrink:0 }}>✓ {t('Accept')}</button>
               </div>
             ))}
           </div>
         )}
+
+        {/* ── Incoming job request ── */}
         {jobAlert && (
-          <div style={{ background:'#1C1C1E', borderRadius:20, padding:16, border:'2px solid '+Y }}>
-            <h3 style={{ color:Y, fontWeight:800, fontSize:15, marginBottom:12 }}>🔔 {t('New Job Request!')}</h3>
-            {[['Service',jobAlert.service],['Address',jobAlert.address],['City',jobAlert.city]].map(([k,v]) => (
-              <div key={k} style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-                <span style={{ color:'#636366', fontSize:12 }}>{k}</span>
-                <span style={{ color:'#fff', fontSize:13, fontWeight:600, maxWidth:'60%', textAlign:'right' }}>{v}</span>
-              </div>
-            ))}
-            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}>
-              <span style={{ color:'#636366', fontSize:12 }}>{t('Starting price')}</span>
-              <span style={{ color:Y, fontSize:18, fontWeight:800 }}>from ₹{jobFloor(jobAlert)}</span>
+          <div style={{ ...card, padding:16, border:`2px solid ${C.yellow}` }}>
+            <h3 style={{ color:C.text, fontWeight:800, fontSize:15, marginBottom:10 }}>🔔 {t('New Job Request!')}</h3>
+            <KV k="Service" v={jobAlert.service} />
+            <KV k="Address" v={jobAlert.address} />
+            <KV k="City"    v={jobAlert.city} />
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0 14px' }}>
+              <span style={{ color:C.text3, fontSize:12.5 }}>{t('Starting price')}</span>
+              <span style={{ color:C.green, fontSize:19, fontWeight:900 }}>from ₹{jobFloor(jobAlert)}</span>
             </div>
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={acceptJob} style={{ flex:1, background:GREEN, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer' }}>✓ {t('Accept')}</button>
-              <button onClick={() => setJobAlert(null)} style={{ flex:1, background:RED, color:'#fff', border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer' }}>✕ {t('Decline')}</button>
+              <button onClick={acceptJob} style={{ ...btnGreen, flex:1 }}>✓ {t('Accept')}</button>
+              <button onClick={() => setJobAlert(null)}
+                style={{ ...btnPrimary, flex:1, background:C.card, color:C.red, border:`1.5px solid ${C.red}` }}>✕ {t('Decline')}</button>
             </div>
           </div>
         )}
+
+        {/* ── Active job ── */}
         {activeJob && (
-          <div style={{ background:'#111', borderRadius:20, padding:16, border:'2px solid '+GREEN }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
-              <p style={{ fontWeight:800, fontSize:14, color:'#fff' }}>🔧 {t('Active Job')}</p>
-              <span style={{ background: activeJob.payment_status==='verified' ? '#D1FAE5' : activeJob.payment_status==='pending_verification' ? '#E0F2FE' : '#2a2a2a', color: activeJob.payment_status==='verified' ? '#065F46' : activeJob.payment_status==='pending_verification' ? '#0369A1' : '#636366', fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:8 }}>
-                {activeJob.payment_status==='verified' ? '✅ Verified' : activeJob.payment_status==='pending_verification' ? '🔍 Under Review' : activeJob.status==='priced' ? t('Awaiting Payment') : activeJob.status==='otp_verified' ? '✅ Completed' : t('In Progress')}
-              </span>
+          <div style={{ ...card, padding:16, border:`1.5px solid ${C.green}` }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:3, gap:8 }}>
+              <p style={{ fontWeight:800, fontSize:14.5, color:C.text }}>🔧 {t('Active Job')}</p>
+              {activeJob.payment_status==='verified'
+                ? <Pill bg={C.greenL} color={C.green}>✅ Verified</Pill>
+                : activeJob.payment_status==='pending_verification'
+                ? <Pill bg={C.blueL} color={C.blue}>🔍 Under Review</Pill>
+                : <Pill>{activeJob.status==='priced' ? t('Awaiting Payment') : activeJob.status==='otp_verified' ? '✅ Completed' : t('In Progress')}</Pill>}
             </div>
-            {bookingRef && <p style={{ color:'#636366', fontSize:11, fontFamily:'monospace', marginBottom:10 }}>{bookingRef}</p>}
-            {[['Customer',activeJob.customer_name||'—'],['Service',activeJob.service],['Address',activeJob.address]].map(([k,v]) => (
-              <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #1a1a1a' }}>
-                <span style={{ fontSize:13, color:'#636366' }}>{k}</span>
-                <span style={{ fontSize:13, fontWeight:600, color:'#fff', maxWidth:'60%', textAlign:'right' }}>{v}</span>
-              </div>
-            ))}
-            {/* Show map + actions only when job is in progress (no payment yet) */}
+            {bookingRef && <p style={{ color:C.text3, fontSize:11, fontFamily:'monospace', marginBottom:8 }}>{bookingRef}</p>}
+            <KV k="Customer" v={activeJob.customer_name||'—'} />
+            <KV k="Service"  v={activeJob.service} />
+            <KV k="Address"  v={activeJob.address} />
+
+            {/* Map + actions only while the job is in progress */}
             {!paymentStarted(activeJob.payment_status) && <>
               <MapView
                 customerLat={activeJob.address_lat} customerLng={activeJob.address_lng}
                 workerLat={activeJob.worker?.lat || profile?.lat} workerLng={activeJob.worker?.lng || profile?.lng}
-                style={{ borderRadius:12, height:160, overflow:'hidden', marginTop:10 }} />
+                style={{ borderRadius:12, height:160, overflow:'hidden', marginTop:12, border:`1px solid ${C.line}` }} />
               <div style={{ display:'flex', gap:8, marginTop:10 }}>
-                <button onClick={navigateToCustomer} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>🗺️ {t('Directions')}</button>
+                <button onClick={navigateToCustomer}
+                  style={{ ...btnPrimary, flex:1, background:C.cardAlt, color:C.text, border:`1.5px solid ${C.line}`, padding:12, fontSize:13 }}>🗺️ {t('Directions')}</button>
                 {activeJob.customer_phone
-                  ? <a href={'tel:+91'+activeJob.customer_phone} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer', textAlign:'center', textDecoration:'none', color:'#000' }}>📞 {t('Call Customer')}</a>
-                  : <button onClick={() => showToast('Customer phone not available')} style={{ flex:1, background:Y, border:'none', borderRadius:12, padding:11, fontWeight:700, fontSize:13, cursor:'pointer' }}>📞 Call</button>}
+                  ? <a href={'tel:+91'+activeJob.customer_phone}
+                      style={{ ...btnPrimary, flex:1, padding:12, fontSize:13, textAlign:'center', textDecoration:'none', display:'block' }}>📞 {t('Call Customer')}</a>
+                  : <button onClick={() => showToast('Customer phone not available')}
+                      style={{ ...btnPrimary, flex:1, padding:12, fontSize:13 }}>📞 Call</button>}
               </div>
             </>}
-            {/* Photo upload — only before price is sent */}
+
+            {/* Before / after photos — only before the price is sent */}
             {!paymentStarted(activeJob.payment_status) && activeJob.status!=='priced' && (
               <div style={{ display:'flex', gap:8, marginTop:10 }}>
                 {[['before', activeJob.photo_before_url],['after', activeJob.photo_after_url]].map(([which, url]) => (
-                  <label key={which} style={{ flex:1, background: url ? '#0d2818' : '#1C1C1E', border:'1px solid '+(url?GREEN:'#2a2a2a'), borderRadius:12, padding:10, textAlign:'center', cursor:'pointer', fontSize:12, fontWeight:700, color: url ? '#4ade80' : '#888' }}>
+                  <label key={which} style={{ flex:1, background: url ? C.greenL : C.cardAlt,
+                    border:`1.5px solid ${url ? C.green : C.line}`, borderRadius:12, padding:11, textAlign:'center',
+                    cursor:'pointer', fontSize:12.5, fontWeight:700, color: url ? C.green : C.text2 }}>
                     {photoBusy===which ? '...' : (url ? '✓ ' : '📷 ')+t(which==='before'?'Before':'After')}
                     <input type="file" accept="image/*" capture="environment" style={{ display:'none' }}
                       onChange={e => uploadJobPhoto(which, e.target.files[0])} />
@@ -440,91 +493,107 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
                 ))}
               </div>
             )}
-            {/* STEP 1 — Work done → verify customer OTP (gates completion) */}
+
+            {/* STEP 1 — Work done → verify customer OTP */}
             {activeJob.status!=='priced' && !paymentStarted(activeJob.payment_status) && !activeJob.otp_verified_at && !otpOpen && (
-              <button onClick={() => { setOtpInput(''); setOtpOpen(true) }} style={{ width:'100%', background:GREEN, color:'#fff', border:'none', borderRadius:14, padding:15, fontWeight:800, fontSize:14, cursor:'pointer', marginTop:10 }}>✅ Work Done — Verify Customer OTP</button>
+              <button onClick={() => { setOtpInput(''); setOtpOpen(true) }}
+                style={{ ...btnGreen, marginTop:10 }}>✅ Work Done — Verify Customer OTP</button>
             )}
             {activeJob.status!=='priced' && !paymentStarted(activeJob.payment_status) && !activeJob.otp_verified_at && otpOpen && (
-              <div style={{ background:'#1C1C1E', borderRadius:14, padding:14, marginTop:10 }}>
-                <p style={{ color:Y, fontWeight:800, fontSize:13, marginBottom:4 }}>🔐 Customer Verification</p>
-                <p style={{ color:'#636366', fontSize:11, marginBottom:10 }}>Ask the customer for the 4-digit code in their app, then enter it to confirm the job is done.</p>
-                <input value={otpInput} onChange={e => setOtpInput(e.target.value.replace(/\D/g,'').slice(0,6))} type="tel" inputMode="numeric" placeholder="• • • •"
-                  style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:12, fontSize:22, fontWeight:800, letterSpacing:8, textAlign:'center', color:'#fff', outline:'none', fontFamily:'inherit', marginBottom:10, boxSizing:'border-box' }} />
+              <div style={{ background:C.cardAlt, borderRadius:14, padding:14, marginTop:10, border:`1px solid ${C.line}` }}>
+                <p style={{ color:C.text, fontWeight:800, fontSize:13.5, marginBottom:4 }}>🔐 Customer Verification</p>
+                <p style={{ color:C.text3, fontSize:11.5, marginBottom:10 }}>Ask the customer for the 4-digit code in their app, then enter it to confirm the job is done.</p>
+                <input value={otpInput} onChange={e => setOtpInput(e.target.value.replace(/\D/g,'').slice(0,6))}
+                  type="tel" inputMode="numeric" placeholder="• • • •"
+                  style={{ ...input, fontSize:22, fontWeight:800, letterSpacing:8, textAlign:'center', marginBottom:10 }} />
                 <div style={{ display:'flex', gap:8 }}>
-                  <button onClick={() => { setOtpOpen(false); setOtpInput('') }} style={{ flex:1, background:'#2a2a2a', color:'#fff', border:'none', borderRadius:10, padding:12, fontWeight:700, fontSize:13, cursor:'pointer' }}>{t('Cancel')}</button>
-                  <button onClick={verifyOtp} disabled={busy} style={{ flex:2, background:GREEN, color:'#fff', border:'none', borderRadius:10, padding:12, fontWeight:800, fontSize:13, cursor:'pointer', opacity:busy?0.6:1 }}>{busy?'...':'Verify & Complete ✓'}</button>
+                  <button onClick={() => { setOtpOpen(false); setOtpInput('') }}
+                    style={{ ...btnPrimary, flex:1, background:C.card, color:C.text2, border:`1.5px solid ${C.line}`, padding:12, fontSize:13 }}>{t('Cancel')}</button>
+                  <button onClick={verifyOtp} disabled={busy}
+                    style={{ ...btnGreen, flex:2, padding:12, fontSize:13, opacity:busy?.6:1 }}>{busy?'...':'Verify & Complete ✓'}</button>
                 </div>
               </div>
             )}
-            {/* STEP 2 — OTP verified → detailed price breakdown quotation */}
+
+            {/* STEP 2 — OTP verified → price breakdown quotation */}
             {activeJob.status!=='priced' && !paymentStarted(activeJob.payment_status) && activeJob.otp_verified_at && (
-              <div style={{ background:'#1C1C1E', borderRadius:14, padding:14, marginTop:10 }}>
-                <p style={{ color:Y, fontWeight:800, fontSize:13, marginBottom:2 }}>🧾 Final Quotation</p>
-                <p style={{ color:'#636366', fontSize:11, marginBottom:12 }}>Minimum total: ₹{jobFloor(activeJob)} · 10% platform fee applies on payment</p>
+              <div style={{ background:C.cardAlt, borderRadius:14, padding:14, marginTop:10, border:`1px solid ${C.line}` }}>
+                <p style={{ color:C.text, fontWeight:800, fontSize:13.5, marginBottom:2 }}>🧾 Final Quotation</p>
+                <p style={{ color:C.text3, fontSize:11.5, marginBottom:12 }}>Minimum total: ₹{jobFloor(activeJob)} · 10% platform fee applies on payment</p>
                 {[
-                  ['labor',      'Labour charge ₹ *',  'e.g. 400'],
-                  ['material',   'Material cost ₹',    'e.g. 250 (optional)'],
+                  ['labor',      'Labour charge ₹ *',   'e.g. 400'],
+                  ['material',   'Material cost ₹',     'e.g. 250 (optional)'],
                   ['additional', 'Additional charges ₹','e.g. 100 (optional)'],
-                ].map(([key, label, ph]) => (
-                  <div key={key} style={{ marginBottom:8 }}>
-                    <label style={{ fontSize:10, fontWeight:700, color:'#636366', display:'block', marginBottom:4, textTransform:'uppercase', letterSpacing:.4 }}>{label}</label>
-                    <input value={bd[key]} onChange={e => setBd(prev => ({ ...prev, [key]: e.target.value.replace(/\D/g,'').slice(0,6) }))} type="tel" inputMode="numeric" placeholder={ph}
-                      style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:11, fontSize:14, fontWeight:700, color:'#fff', outline:'none', fontFamily:'inherit', boxSizing:'border-box' }} />
+                ].map(([key, lb, ph]) => (
+                  <div key={key} style={{ marginBottom:9 }}>
+                    <label style={{ ...label, fontSize:10 }}>{lb}</label>
+                    <input value={bd[key]} onChange={e => setBd(prev => ({ ...prev, [key]: e.target.value.replace(/\D/g,'').slice(0,6) }))}
+                      type="tel" inputMode="numeric" placeholder={ph}
+                      style={{ ...input, padding:11, fontSize:14, fontWeight:700 }} />
                   </div>
                 ))}
-                <textarea value={bd.note} onChange={e => setBd(prev => ({ ...prev, note: e.target.value.slice(0,160) }))} placeholder="Work notes — what you did, parts replaced, etc."
-                  rows={2} style={{ width:'100%', background:'#111', border:'1.5px solid #2a2a2a', borderRadius:10, padding:11, fontSize:13, color:'#fff', outline:'none', fontFamily:'inherit', boxSizing:'border-box', resize:'none', marginBottom:10 }} />
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background:'#111', borderRadius:10, padding:'10px 14px', marginBottom:10 }}>
+                <textarea value={bd.note} onChange={e => setBd(prev => ({ ...prev, note: e.target.value.slice(0,160) }))}
+                  placeholder="Work notes — what you did, parts replaced, etc." rows={2}
+                  style={{ ...input, padding:11, fontSize:13, resize:'none', marginBottom:10 }} />
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
+                  background:C.card, border:`1px solid ${C.line}`, borderRadius:12, padding:'11px 14px', marginBottom:10 }}>
                   <div>
-                    <p style={{ color:'#636366', fontSize:11 }}>Total to customer</p>
-                    <p style={{ color:Y, fontSize:22, fontWeight:900 }}>₹{breakdownTotal(bd).toLocaleString('en-IN')}</p>
+                    <p style={{ color:C.text3, fontSize:11 }}>Total to customer</p>
+                    <p style={{ color:C.text, fontSize:22, fontWeight:900 }}>₹{breakdownTotal(bd).toLocaleString('en-IN')}</p>
                   </div>
                   <div style={{ textAlign:'right' }}>
-                    <p style={{ color:'#636366', fontSize:11 }}>You earn (90%)</p>
-                    <p style={{ color:GREEN, fontSize:16, fontWeight:800 }}>₹{workerShare(breakdownTotal(bd)).toLocaleString('en-IN')}</p>
+                    <p style={{ color:C.text3, fontSize:11 }}>You earn (90%)</p>
+                    <p style={{ color:C.green, fontSize:16, fontWeight:800 }}>₹{workerShare(breakdownTotal(bd)).toLocaleString('en-IN')}</p>
                   </div>
                 </div>
-                <button onClick={submitQuote} disabled={busy} style={{ width:'100%', background:Y, border:'none', borderRadius:12, padding:14, fontWeight:800, fontSize:14, cursor:'pointer', opacity:busy?0.6:1, fontFamily:'inherit' }}>{busy?'...':'Send Quotation to Customer →'}</button>
+                <button onClick={submitQuote} disabled={busy}
+                  style={{ ...btnPrimary, opacity:busy?.6:1 }}>{busy?'...':'Send Quotation to Customer →'}</button>
               </div>
             )}
-            {/* Awaiting payment — price sent, customer hasn't paid yet */}
+
+            {/* Awaiting payment */}
             {activeJob.status==='priced' && !paymentStarted(activeJob.payment_status) && (
-              <div style={{ background:'#1C1C1E', borderRadius:14, padding:16, marginTop:10, textAlign:'center' }}>
-                <div style={{ fontSize:30, marginBottom:8 }}>⏳</div>
-                <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>₹{activeJob.amount} sent to customer</p>
-                <p style={{ color:'#636366', fontSize:12, marginTop:4 }}>Waiting for them to pay via UPI to KaamReady...</p>
+              <div style={{ background:C.cardAlt, border:`1px solid ${C.line}`, borderRadius:14, padding:16, marginTop:10, textAlign:'center' }}>
+                <div style={{ fontSize:28, marginBottom:8 }}>⏳</div>
+                <p style={{ color:C.text, fontWeight:800, fontSize:15 }}>₹{activeJob.amount} sent to customer</p>
+                <p style={{ color:C.text3, fontSize:12, marginTop:4 }}>Waiting for them to pay via UPI to KaamReady...</p>
               </div>
             )}
-            {/* Customer paid — waiting for admin verification */}
+            {/* Paid — awaiting admin verification */}
             {activeJob.payment_status==='pending_verification' && (
-              <div style={{ background:'#0d1f35', border:'1px solid #3b82f6', borderRadius:14, padding:16, marginTop:10, textAlign:'center' }}>
-                <div style={{ fontSize:30, marginBottom:8 }}>🔍</div>
-                <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>Customer paid ₹{activeJob.amount}</p>
-                <p style={{ color:'#9ca3af', fontSize:12, margin:'4px 0 0' }}>KaamReady admin is verifying the payment. Your earnings will be credited once verified.</p>
+              <div style={{ background:C.blueL, border:`1px solid ${C.blue}`, borderRadius:14, padding:16, marginTop:10, textAlign:'center' }}>
+                <div style={{ fontSize:28, marginBottom:8 }}>🔍</div>
+                <p style={{ color:C.text, fontWeight:800, fontSize:15 }}>Customer paid ₹{activeJob.amount}</p>
+                <p style={{ color:C.text2, fontSize:12, marginTop:4 }}>KaamReady admin is verifying the payment. Your earnings will be credited once verified.</p>
               </div>
             )}
-            {/* Payment verified by admin */}
+            {/* Verified */}
             {activeJob.payment_status==='verified' && (
-              <div style={{ background:'#0d2818', border:'1px solid '+GREEN, borderRadius:14, padding:16, marginTop:10, textAlign:'center' }}>
-                <div style={{ fontSize:30, marginBottom:8 }}>✅</div>
-                <p style={{ color:'#fff', fontWeight:800, fontSize:15 }}>{t('Payment verified!')}</p>
-                <p style={{ color:'#4ade80', fontSize:13, marginTop:4 }}>₹{Math.round((activeJob.amount||0)*0.9)} credited to your wallet 💰</p>
+              <div style={{ background:C.greenL, border:`1px solid ${C.green}`, borderRadius:14, padding:16, marginTop:10, textAlign:'center' }}>
+                <div style={{ fontSize:28, marginBottom:8 }}>✅</div>
+                <p style={{ color:C.text, fontWeight:800, fontSize:15 }}>{t('Payment verified!')}</p>
+                <p style={{ color:C.green, fontSize:13, marginTop:4, fontWeight:600 }}>₹{Math.round((activeJob.amount||0)*0.9)} credited to your wallet 💰</p>
                 <button onClick={() => { setActiveJob(null); setBd(EMPTY_BREAKDOWN); setOtpInput(''); setOtpOpen(false) }}
-                  style={{ marginTop:12, background:GREEN, color:'#fff', border:'none', borderRadius:10, padding:'10px 20px', fontWeight:800, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
-                  Done ✓
-                </button>
+                  style={{ ...btnGreen, width:'auto', marginTop:12, padding:'10px 22px', fontSize:13 }}>Done ✓</button>
               </div>
             )}
           </div>
         )}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
-          {[['₹'+todayEarn.toLocaleString('en-IN'),t('Today')],[todayJobs,t('Jobs done')],[(profile?.rating||5.0)+'⭐',t('Rating')]].map(([v,l]) => (
-            <div key={l} style={{ background:YL, borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
-              <div style={{ fontSize:17, fontWeight:800 }}>{v}</div>
-              <div style={{ fontSize:10, color:'#888', marginTop:2 }}>{l}</div>
+
+        {/* ── Today summary tiles ── */}
+        <div style={{ ...card, overflow:'hidden', display:'grid', gridTemplateColumns:'repeat(3,1fr)' }}>
+          {[
+            ['₹'+Math.round(todayEarn*0.9).toLocaleString('en-IN'), t('Today'), C.green],
+            [todayJobs, t('Jobs done'), C.text],
+            [(profile?.rating||5.0)+'★', t('Rating'), C.yellowD],
+          ].map(([v,l,c], i) => (
+            <div key={l} style={{ padding:'14px 8px', textAlign:'center', borderRight: i < 2 ? `1px solid ${C.line}` : 'none' }}>
+              <div style={{ fontSize:17, fontWeight:800, color:c }}>{v}</div>
+              <div style={{ fontSize:11, color:C.text3, marginTop:3 }}>{l}</div>
             </div>
           ))}
         </div>
+        <div style={{ height:8 }} />
       </div>
     </div>
   )

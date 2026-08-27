@@ -46,7 +46,7 @@ export default function AvatarUpload({ user, userId, currentUrl, table = 'profil
     setUploading(false)
   }
 
-  const bg = dark ? '#1a1a1a' : '#FFF8D6'
+  const bg = dark ? '#F1F1F3' : '#FFF7DA'
 
   return (
     <label style={{ cursor:'pointer', display:'block', width:size, height:size, borderRadius:size*0.28, margin:'0 auto', position:'relative' }}>

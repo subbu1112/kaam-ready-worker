@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { sb } from '../lib/supabase'
 
-const Y='#F5C000', GREEN='#22c55e', BK='#1C1C1E'
+const Y='#F5C000', GREEN='#0FA958', BK='#FFFFFF'
 
 const ICONS = {
   job:      '🔔',
@@ -62,38 +62,38 @@ export default function NotificationsScreen({ user, showToast }) {
   const unreadCount = items.filter(n => !n.read).length
 
   return (
-    <div style={{ flex:1, minHeight:0, position:'relative' }}>
-      <div style={{ position:'absolute', inset:0, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:16, paddingBottom:32 }}>
+    <div style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column' }}>
+      <div style={{ flex:1, minHeight:0, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:16, paddingBottom:32 }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-          <h1 style={{ color:'#fff', fontSize:20, fontWeight:800 }}>🔔 Notifications</h1>
+          <h1 style={{ color:'#1A1A1A', fontSize:18, fontWeight:800 }}>Notifications</h1>
           {unreadCount > 0 && (
-            <button onClick={markAll} style={{ background:'#2a2a2a', color:Y, border:'none', borderRadius:10, padding:'7px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+            <button onClick={markAll} style={{ background:'#F1F1F3', color:'#1A1A1A', border:'none', borderRadius:10, padding:'7px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
               Mark all read
             </button>
           )}
         </div>
 
         {loading ? (
-          <p style={{ color:'#777', fontSize:13, textAlign:'center', padding:24 }}>Loading…</p>
+          <p style={{ color:'#6B6B70', fontSize:13, textAlign:'center', padding:24 }}>Loading…</p>
         ) : items.length === 0 ? (
-          <div style={{ background:BK, borderRadius:16, padding:'36px 20px', textAlign:'center', border:'1px dashed #2a2a2a' }}>
+          <div style={{ background:BK, borderRadius:16, padding:'36px 20px', textAlign:'center', border:'1px dashed #E9E9EB' }}>
             <div style={{ fontSize:40, marginBottom:10 }}>🔕</div>
-            <p style={{ color:'#aaa', fontSize:15, fontWeight:700 }}>You're all caught up</p>
-            <p style={{ color:'#555', fontSize:12, marginTop:5 }}>Job alerts, payments and updates will show here.</p>
+            <p style={{ color:'#6B6B70', fontSize:15, fontWeight:700 }}>You're all caught up</p>
+            <p style={{ color:'#9A9AA0', fontSize:12, marginTop:5 }}>Job alerts, payments and updates will show here.</p>
           </div>
         ) : items.map(n => (
           <div key={n.id} onClick={() => !n.read && markRead(n.id)}
-            style={{ display:'flex', gap:12, background: n.read ? BK : '#23200d', borderRadius:14, padding:'13px 14px', marginBottom:8, border:'1px solid '+(n.read?'#2a2a2a':Y), cursor:'pointer' }}>
-            <div style={{ width:40, height:40, borderRadius:12, background:'#111', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>
+            style={{ display:'flex', gap:12, background: n.read ? BK : '#FFFCEF', borderRadius:14, padding:'13px 14px', marginBottom:8, border:'1px solid '+(n.read?'#E9E9EB':Y), cursor:'pointer' }}>
+            <div style={{ width:40, height:40, borderRadius:12, background:'#F1F1F3', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>
               {ICONS[n.type] || ICONS.default}
             </div>
             <div style={{ flex:1, minWidth:0 }}>
               <div style={{ display:'flex', justifyContent:'space-between', gap:8 }}>
-                <p style={{ color:'#fff', fontSize:14, fontWeight:700 }}>{n.title || 'Update'}</p>
+                <p style={{ color:'#1A1A1A', fontSize:14, fontWeight:700 }}>{n.title || 'Update'}</p>
                 {!n.read && <span style={{ width:8, height:8, borderRadius:'50%', background:Y, flexShrink:0, marginTop:5 }} />}
               </div>
-              {n.body && <p style={{ color:'#9ca3af', fontSize:12, marginTop:3, lineHeight:1.4 }}>{n.body}</p>}
-              <p style={{ color:'#555', fontSize:11, marginTop:5 }}>{fmtDate(n.created_at)}</p>
+              {n.body && <p style={{ color:'#6B6B70', fontSize:12, marginTop:3, lineHeight:1.4 }}>{n.body}</p>}
+              <p style={{ color:'#9A9AA0', fontSize:11, marginTop:5 }}>{fmtDate(n.created_at)}</p>
             </div>
           </div>
         ))}

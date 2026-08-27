@@ -1,9 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-html, body, #root { height: 100%; font-family: 'Inter', sans-serif; background: #0A0A0A; overflow: hidden; }
+html, body, #root {
+  height: 100%;
+  font-family: 'Inter', sans-serif;
+  background: #F4F5F6;
+  color: #1A1A1A;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
 ::-webkit-scrollbar { display: none; }
+input, select, textarea, button { font-family: inherit; }
+input::placeholder, textarea::placeholder { color: #B4B4B8; }
 @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
 @keyframes popIn { from{transform:scale(.8);opacity:0} to{transform:scale(1);opacity:1} }
 @keyframes slideUp { from{transform:translateY(12px);opacity:0} to{transform:translateY(0);opacity:1} }
+@keyframes spin { to { transform: rotate(360deg) } }
 .animate-float { animation: float 2s ease-in-out infinite; }
 .animate-popIn { animation: popIn 0.35s ease; }
