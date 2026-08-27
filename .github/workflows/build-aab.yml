@@ -23,6 +23,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -138,6 +140,19 @@ jobs:
             android/app-release-signed.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish the bundle as a release asset
+        working-directory: android
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TAG="worker-v${{ github.event.inputs.versionCode }}"
+          gh release delete "$TAG" -y --cleanup-tag || true
+          gh release create "$TAG" \
+            app-release-bundle.aab app-release-signed.apk \
+            --title "Worker app ${{ github.event.inputs.versionName }} (versionCode ${{ github.event.inputs.versionCode }})" \
+            --notes "Trusted Web Activity bundle for worker.thekaamready.in, targetSdkVersion 36."
 
       - name: Clean up keystore
         if: always()
