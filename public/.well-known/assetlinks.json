@@ -1,11 +1,13 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "in.thekaamready.worker",
       "sha256_cert_fingerprints": [
-        "REPLACE_WITH_YOUR_PLAY_APP_SIGNING_SHA256_FINGERPRINT"
+        "03:95:20:42:C5:94:D7:DF:F3:D1:22:49:C1:1A:76:23:3B:8F:67:2B:49:6A:50:3B:C6:38:E7:A1:01:4F:72:95"
       ]
     }
   }
