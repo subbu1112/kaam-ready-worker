@@ -1,0 +1,42 @@
+{
+  "packageId": "in.thekaamready.worker",
+  "host": "worker.thekaamready.in",
+  "name": "Kaam Ready Worker",
+  "launcherName": "KR Worker",
+  "display": "standalone",
+  "themeColor": "#1A1A1A",
+  "themeColorDark": "#1A1A1A",
+  "navigationColor": "#FFFFFF",
+  "navigationColorDark": "#FFFFFF",
+  "navigationDividerColor": "#00000000",
+  "navigationDividerColorDark": "#00000000",
+  "backgroundColor": "#F4F5F6",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://worker.thekaamready.in/icon-512.png",
+  "maskableIconUrl": "https://worker.thekaamready.in/icon-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./signing.keystore",
+    "alias": "worker-upload"
+  },
+  "appVersionCode": 1,
+  "appVersion": "1.0.0",
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://worker.thekaamready.in/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://worker.thekaamready.in/",
+  "minSdkVersion": 21,
+  "orientation": "any",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": []
+}
