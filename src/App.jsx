@@ -82,10 +82,11 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
+    const failsafe = setTimeout(() => setAuthChecked(true), 6000)
     sb.auth.getSession().then(({ data }) => {
       if (data.session?.user) { setUser(data.session.user); loadProfile(data.session.user.id) }
       else setAuthChecked(true)
-    })
+    }).catch(() => setAuthChecked(true)).finally(() => clearTimeout(failsafe))
     const { data: { subscription } } = sb.auth.onAuthStateChange((_e, session) => {
       if (session?.user) { setUser(session.user); loadProfile(session.user.id) }
       // Signing out returns to the public page, not to a bare login form.
