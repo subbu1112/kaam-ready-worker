@@ -5,6 +5,7 @@ import TabBar  from './components/TabBar'
 import { C } from './theme'
 import Toast   from './components/Toast'
 import TermsModal, { termsAccepted, acceptTerms } from './components/TermsModal'
+import { entryScreen } from './lib/installed'
 
 const LandingScreen    = lazy(() => import('./screens/LandingScreen'))
 const LoginScreen      = lazy(() => import('./screens/LoginScreen'))
@@ -70,10 +71,9 @@ function PageLoader() {
 }
 
 export default function App() {
-  // Public home page first. The worker domain used to open straight on the
-  // sign-in form, so anyone arriving from search or an ad landed on a login
-  // box with no explanation of the offer.
-  const [screen,    setScreen]    = useState('landing')
+  // Web visitors get the public home page; the installed app goes straight to
+  // sign-in, because someone who already installed it does not need the pitch.
+  const [screen,    setScreen]    = useState(entryScreen)
   const [tab,       setTab]       = useState('home')
   const [user,      setUser]      = useState(null)
   const [profile,   setProfile]   = useState(null)
@@ -90,7 +90,7 @@ export default function App() {
     const { data: { subscription } } = sb.auth.onAuthStateChange((_e, session) => {
       if (session?.user) { setUser(session.user); loadProfile(session.user.id) }
       // Signing out returns to the public page, not to a bare login form.
-      else { setUser(null); setProfile(null); setScreen('landing'); setAuthChecked(true) }
+      else { setUser(null); setProfile(null); setScreen(entryScreen()); setAuthChecked(true) }
     })
     return () => subscription.unsubscribe()
   }, [])

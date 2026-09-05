@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { C } from '../theme'
+import ServiceAreaNotice from '../components/ServiceAreaNotice'
 
 const Y = '#F5C000', YD = '#B8900A', YL = '#FFF7DA', BK = '#1A1A1A', GREEN = '#0FA958'
 
@@ -148,6 +149,8 @@ export default function LandingScreen({ setScreen }) {
 
   return (
     <div style={{ background: '#fff', minHeight: '100vh', color: BK }}>
+
+      <ServiceAreaNotice />
 
       {/* ── Nav ───────────────────────────────────────────────────────── */}
       <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(255,255,255,.96)',
