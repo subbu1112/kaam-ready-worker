@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "in.thekaamready.worker",
       "sha256_cert_fingerprints": [
-        "03:95:20:42:C5:94:D7:DF:F3:D1:22:49:C1:1A:76:23:3B:8F:67:2B:49:6A:50:3B:C6:38:E7:A1:01:4F:72:95"
+        "03:95:20:42:C5:94:D7:DF:F3:D1:22:49:C1:1A:76:23:3B:8F:67:2B:49:6A:50:3B:C6:38:E7:A1:01:4F:72:95",
+        "CC:24:53:D4:0D:9A:D1:60:96:3B:49:77:42:0D:87:2C:16:A8:A1:32:B2:F1:C4:E0:1E:6B:3E:14:4E:E8:F5:37"
       ]
     }
   }
