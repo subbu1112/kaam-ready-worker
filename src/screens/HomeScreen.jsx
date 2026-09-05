@@ -5,6 +5,8 @@ import { floorFor, EMPTY_BREAKDOWN, breakdownTotal, workerShare } from '../const
 import { t } from '../i18n'
 import { C, card, scroller, btnPrimary, btnGreen, input, label } from '../theme'
 import { Pill } from '../components/UI'
+import { haversineKm, travelInfo, currentPosition } from '../lib/geo'
+import { WORKER_CANCEL_REASONS } from '../lib/cancelReasons'
 
 export default function HomeScreen({ user, profile, showToast, setTab }) {
   const [online,    setOnline]    = useState(() => { try { return localStorage.getItem('kr_worker_online') === 'true' } catch { return false } })
@@ -20,9 +22,36 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
   const [schedAvail,setSchedAvail]= useState([])
   const [photoBusy, setPhotoBusy] = useState(null)
   const [demand,    setDemand]    = useState(false)   // "high demand areas" hint
-  const timer=useRef(null), chan=useRef(null), jobChan=useRef(null)
+  // The worker's own live coordinates — the origin for every distance shown.
+  const [myPos,     setMyPos]     = useState(null)
+  const [cancelOpen,setCancelOpen]= useState(false)
+  const [cancelCode,setCancelCode]= useState('')
+  const [cancelNote,setCancelNote]= useState('')
+  const timer=useRef(null), chan=useRef(null), jobChan=useRef(null), posTimer=useRef(null)
 
   useEffect(() => { if(profile) loadTodayStats() }, [profile])
+
+  // A stale position means a wrong distance on the job card, which is worse
+  // than none. Refresh on mount, whenever duty is toggled on, and every two
+  // minutes while on duty; mirror it to the workers row so the customer's
+  // tracking map and the dispatch ordering see the same coordinates.
+  useEffect(() => {
+    let cancelled = false
+    async function refresh() {
+      const pos = await currentPosition()
+      if (cancelled || !pos) return
+      setMyPos(pos)
+      if (user?.id) sb.from('workers').update({ lat: pos.lat, lng: pos.lng }).eq('id', user.id).then(()=>{})
+    }
+    refresh()
+    if (posTimer.current) clearInterval(posTimer.current)
+    if (online) posTimer.current = setInterval(refresh, 120000)
+    return () => { cancelled = true; if (posTimer.current) { clearInterval(posTimer.current); posTimer.current = null } }
+  }, [online, user?.id])
+
+  // Fall back to the last position stored on the profile until GPS answers.
+  const originLat = myPos?.lat ?? profile?.lat
+  const originLng = myPos?.lng ?? profile?.lng
 
   // Set offline when page closes
   useEffect(() => {
@@ -120,12 +149,7 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
     if(data) { setTodayJobs(data.length); setTodayEarn(data.reduce((s,b)=>s+(b.amount||0),0)) }
   }
 
-  function kmBetween(lat1,lng1,lat2,lng2) {
-    if (!lat1||!lng1||!lat2||!lng2) return null
-    const Rk=6371, dLat=(lat2-lat1)*Math.PI/180, dLng=(lng2-lng1)*Math.PI/180
-    const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
-    return Rk*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
-  }
+  const kmBetween = haversineKm
 
   // The worker's trade(s): primary skill + any extra skills (multi-skilled).
   function mySkillIds() {
@@ -147,12 +171,17 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
   function offerJob(b) {
     if (b.city !== profile?.city) return
     if (!matchesSkill(b)) return        // electrician won't get plumber jobs, etc.
+    if (b.worker_id === user?.id) return                       // already mine
+    if (activeJob && activeJob.id === b.id) return
+    // A multi-worker request stays open until it is fully staffed; stop
+    // offering it once the last slot is taken.
+    if ((b.workers_accepted || 0) >= Math.max(b.workers_required || 1, 1)) return
     let delay = 0
     if (isEmergency(b)) delay = 0       // 🚨 emergency → alert every worker instantly
     else if (b.preferred_worker_id && b.preferred_worker_id !== user.id) delay = 60000
     else if (b.preferred_worker_id === user.id) delay = 0
     else {
-      const d = kmBetween(profile?.lat, profile?.lng, b.address_lat, b.address_lng)
+      const d = kmBetween(originLat, originLng, b.address_lat, b.address_lng)
       if (d !== null) delay = d <= 5 ? 0 : d <= 10 ? 20000 : 45000
     }
     const show = async () => {
@@ -192,8 +221,8 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
   }
 
   async function acceptScheduled(b) {
-    const { error } = await sb.from('bookings').update({ worker_id: user.id, status:'assigned', worker:{ id:user.id, name:profile?.name, phone:profile?.phone, skill:profile?.skill, rating:profile?.rating, ico:'👷' } }).eq('id', b.id).is('worker_id', null)
-    if (error) { showToast(error.message); return }
+    const { error } = await sb.rpc('accept_booking_as_worker', { p_booking_id: b.id })
+    if (error) { showToast(error.message.replace(/^.*?:\s*/, '')); return }
     showToast('Scheduled job is yours ✓ 📅')
     loadScheduled()
   }
@@ -224,25 +253,31 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
     })
   }
 
-  async function acceptJob() {
-    if(!jobAlert || busy) return
+  async function acceptJob(job) {
+    const target = job || jobAlert
+    if(!target || busy) return
     setBusy(true)
     const pos = await getPosition()
-    if (pos) sb.from('workers').update({ lat: pos.lat, lng: pos.lng }).eq('id', user.id).then(()=>{})
-    // phone travels inside the customer's own booking row (RLS-protected)
-    const w={id:user.id,name:profile?.name,phone:profile?.phone,skill:profile?.skill,rating:profile?.rating,jobs:profile?.total_jobs,ico:'👷',eta:'8 min',dist:'1.0 km',lat:pos?.lat,lng:pos?.lng}
-    // Atomic claim: only succeeds if still open AND this worker is allowed (RLS).
-    const { data, error } = await sb.from('bookings')
-      .update({ status:'assigned', worker_id:user.id, worker:w })
-      .eq('id', jobAlert.id).eq('status','searching').is('worker_id', null)
-      .select().single()
+    if (pos) {
+      setMyPos(pos)
+      sb.from('workers').update({ lat: pos.lat, lng: pos.lng }).eq('id', user.id).then(()=>{})
+    }
+    // Claiming is done server-side: it takes a slot atomically, records this
+    // worker on the booking, and only flips the booking to 'assigned' once the
+    // requested number of workers is reached.
+    const { data, error } = await sb.rpc('accept_booking_as_worker', { p_booking_id: target.id })
     setBusy(false)
     if (error || !data) {
       setJobAlert(null)
-      showToast('Could not accept — it may already be taken, or your KYC isn\'t approved yet')
+      showToast((error?.message || 'Could not accept this job').replace(/^.*?:\s*/, ''))
       return
     }
-    setActiveJob(data); setJobAlert(null); showToast('Job accepted! Navigate to customer 🗺️')
+    setActiveJob(data); setJobAlert(null)
+    const need = Math.max(data.workers_required || 1, 1)
+    showToast(need > 1 && (data.workers_accepted || 0) < need
+      ? `Accepted ✓ ${data.workers_accepted} of ${need} workers so far`
+      : 'Job accepted! Navigate to customer 🗺️')
+    loadScheduled()
   }
 
   function navigateToCustomer() {
@@ -298,6 +333,29 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
     setActiveJob(prev => ({ ...prev, status:'priced', amount: total }))
     setBd(EMPTY_BREAKDOWN)
     showToast('Quotation sent — waiting for customer to accept & pay 💳')
+  }
+
+  // A worker can hit an emergency or find the address unreachable after
+  // accepting. Cancelling here releases the job, tells the customer why, and
+  // (on a multi-worker booking) re-opens only the freed slot.
+  async function cancelActiveJob() {
+    if (!activeJob || busy) return
+    if (!cancelCode) { showToast('Please select a reason'); return }
+    if (cancelCode === 'other' && !cancelNote.trim()) { showToast('Please describe the reason'); return }
+    setBusy(true)
+    const r = WORKER_CANCEL_REASONS.find(x => x.code === cancelCode)
+    const { error } = await sb.rpc('cancel_booking_worker', {
+      p_booking_id: activeJob.id,
+      p_reason_code: cancelCode,
+      p_reason_label: r?.label || cancelCode,
+      p_note: cancelNote.trim() || null,
+    })
+    setBusy(false)
+    if (error) { showToast(error.message.replace(/^.*?:\s*/, '')); return }
+    setCancelOpen(false); setCancelCode(''); setCancelNote('')
+    setActiveJob(null); setOtpOpen(false); setOtpInput(''); setBd(EMPTY_BREAKDOWN)
+    showToast('Job cancelled — the customer has been notified')
+    loadScheduled()
   }
 
   function toggleOnline() { const next=!online; setOnline(next); showToast(next?'You are now On Duty 🟢':'You are now Off Duty') }
@@ -418,7 +476,12 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
                 display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
                 <div style={{ minWidth:0 }}>
                   <p style={{ color:C.text, fontSize:13.5, fontWeight:700 }}>{b.service}</p>
-                  <p style={{ color:C.text3, fontSize:11.5, marginTop:2 }}>{new Date(b.scheduled_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</p>
+                  <p style={{ color:C.text3, fontSize:11.5, marginTop:2 }}>
+                    {new Date(b.scheduled_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}
+                    {travelInfo(originLat, originLng, b.address_lat, b.address_lng).distance
+                      ? ' · ' + travelInfo(originLat, originLng, b.address_lat, b.address_lng).distance + ' away' : ''}
+                    {Math.max(b.workers_required || 1, 1) > 1 ? ` · ${b.workers_required} workers` : ''}
+                  </p>
                 </div>
                 <button onClick={() => acceptScheduled(b)}
                   style={{ ...btnGreen, width:'auto', padding:'9px 15px', fontSize:12.5, flexShrink:0 }}>✓ {t('Accept')}</button>
@@ -428,23 +491,67 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
         )}
 
         {/* ── Incoming job request ── */}
-        {jobAlert && (
-          <div style={{ ...card, padding:16, border:`2px solid ${C.yellow}` }}>
-            <h3 style={{ color:C.text, fontWeight:800, fontSize:15, marginBottom:10 }}>🔔 {t('New Job Request!')}</h3>
-            <KV k="Service" v={jobAlert.service} />
-            <KV k="Address" v={jobAlert.address} />
-            <KV k="City"    v={jobAlert.city} />
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0 14px' }}>
-              <span style={{ color:C.text3, fontSize:12.5 }}>{t('Starting price')}</span>
-              <span style={{ color:C.green, fontSize:19, fontWeight:900 }}>from ₹{jobFloor(jobAlert)}</span>
+        {jobAlert && (() => {
+          const trip = travelInfo(originLat, originLng, jobAlert.address_lat, jobAlert.address_lng)
+          const need = Math.max(jobAlert.workers_required || 1, 1)
+          const have = jobAlert.workers_accepted || 0
+          return (
+            <div style={{ ...card, padding:16, border:`2px solid ${C.yellow}` }}>
+              <h3 style={{ color:C.text, fontWeight:800, fontSize:15, marginBottom:12 }}>🔔 {t('New Job Request!')}</h3>
+
+              {/* Distance first — it is the thing a worker actually decides on. */}
+              <div style={{ display:'flex', alignItems:'center', gap:12, background:C.yellowL,
+                border:`1px solid ${C.yellow}`, borderRadius:14, padding:'12px 14px', marginBottom:12 }}>
+                <div style={{ fontSize:26, lineHeight:1 }}>📍</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  {trip.distance ? (
+                    <>
+                      <p style={{ fontSize:24, fontWeight:900, color:C.text, lineHeight:1.1 }}>
+                        {trip.distance} <span style={{ fontSize:14, fontWeight:700, color:C.text2 }}>away</span>
+                      </p>
+                      <p style={{ fontSize:12, color:C.text2, marginTop:2 }}>{trip.travel} (approx)</p>
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ fontSize:15, fontWeight:800, color:C.text }}>Distance unavailable</p>
+                      <p style={{ fontSize:11.5, color:C.text3, marginTop:2 }}>
+                        Turn on location access to see how far each job is.
+                      </p>
+                    </>
+                  )}
+                </div>
+                {jobAlert.address_lat && jobAlert.address_lng && (
+                  <button onClick={() => window.open(
+                    'https://www.google.com/maps/dir/?api=1&destination=' + jobAlert.address_lat + ',' + jobAlert.address_lng, '_blank')}
+                    style={{ background:C.card, border:`1px solid ${C.line}`, borderRadius:10, padding:'8px 10px',
+                      fontSize:11.5, fontWeight:700, cursor:'pointer', fontFamily:'inherit', color:C.text, flexShrink:0 }}>
+                    🗺️ Map
+                  </button>
+                )}
+              </div>
+
+              <KV k="Service" v={jobAlert.service} />
+              <KV k="Customer location" v={jobAlert.address} />
+              {jobAlert.landmark && <KV k="Landmark" v={jobAlert.landmark} />}
+              <KV k="City"    v={jobAlert.city} />
+              <KV k="Workers required" v={need > 1 ? `${need} workers · ${have} accepted so far` : '1 worker'} />
+              {jobAlert.description && jobAlert.description !== '(No description)' &&
+                <KV k="Details" v={jobAlert.description} />}
+              {jobAlert.is_scheduled && jobAlert.scheduled_at &&
+                <KV k="Scheduled for" v={new Date(jobAlert.scheduled_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})} />}
+
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0 14px' }}>
+                <span style={{ color:C.text3, fontSize:12.5 }}>{t('Starting price')}</span>
+                <span style={{ color:C.green, fontSize:19, fontWeight:900 }}>from ₹{jobFloor(jobAlert)}</span>
+              </div>
+              <div style={{ display:'flex', gap:8 }}>
+                <button onClick={() => acceptJob()} disabled={busy} style={{ ...btnGreen, flex:1, opacity:busy?.6:1 }}>✓ {t('Accept')}</button>
+                <button onClick={() => setJobAlert(null)}
+                  style={{ ...btnPrimary, flex:1, background:C.card, color:C.red, border:`1.5px solid ${C.red}` }}>✕ {t('Decline')}</button>
+              </div>
             </div>
-            <div style={{ display:'flex', gap:8 }}>
-              <button onClick={acceptJob} style={{ ...btnGreen, flex:1 }}>✓ {t('Accept')}</button>
-              <button onClick={() => setJobAlert(null)}
-                style={{ ...btnPrimary, flex:1, background:C.card, color:C.red, border:`1.5px solid ${C.red}` }}>✕ {t('Decline')}</button>
-            </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* ── Active job ── */}
         {activeJob && (
@@ -460,7 +567,16 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
             {bookingRef && <p style={{ color:C.text3, fontSize:11, fontFamily:'monospace', marginBottom:8 }}>{bookingRef}</p>}
             <KV k="Customer" v={activeJob.customer_name||'—'} />
             <KV k="Service"  v={activeJob.service} />
-            <KV k="Address"  v={activeJob.address} />
+            <KV k="Customer location" v={activeJob.address} />
+            {activeJob.landmark && <KV k="Landmark" v={activeJob.landmark} />}
+            {Math.max(activeJob.workers_required || 1, 1) > 1 &&
+              <KV k="Workers on this job" v={`${activeJob.workers_accepted || 1} of ${activeJob.workers_required}`} />}
+            {(() => {
+              const trip = travelInfo(originLat, originLng, activeJob.address_lat, activeJob.address_lng)
+              return trip.distance
+                ? <KV k="Distance" v={`${trip.distance} away · ${trip.travel}`} />
+                : null
+            })()}
 
             {/* Map + actions only while the job is in progress */}
             {!paymentStarted(activeJob.payment_status) && <>
@@ -567,6 +683,53 @@ export default function HomeScreen({ user, profile, showToast, setTab }) {
                 <p style={{ color:C.text2, fontSize:12, marginTop:4 }}>KaamReady admin is verifying the payment. Your earnings will be credited once verified.</p>
               </div>
             )}
+            {/* Cancel after accepting — allowed until the customer has paid */}
+            {!paymentStarted(activeJob.payment_status) && activeJob.status!=='priced' && !cancelOpen && (
+              <button onClick={() => { setCancelCode(''); setCancelNote(''); setCancelOpen(true) }}
+                style={{ ...btnPrimary, marginTop:10, background:C.card, color:C.red,
+                  border:`1.5px solid ${C.red}`, fontSize:14 }}>
+                Cancel Booking
+              </button>
+            )}
+            {cancelOpen && (
+              <div style={{ background:C.redL, borderRadius:14, padding:14, marginTop:10, border:`1px solid ${C.red}` }}>
+                <p style={{ color:C.text, fontWeight:800, fontSize:13.5, marginBottom:2 }}>Why are you cancelling?</p>
+                <p style={{ color:C.text2, fontSize:11.5, marginBottom:10 }}>
+                  The customer is told straight away so they can rebook. Frequent cancellations affect your acceptance rate.
+                </p>
+                <div style={{ display:'flex', flexDirection:'column', gap:7, marginBottom:10 }}>
+                  {WORKER_CANCEL_REASONS.map(r => (
+                    <button key={r.code} onClick={() => setCancelCode(r.code)}
+                      style={{ display:'flex', alignItems:'center', gap:10, textAlign:'left',
+                        background: cancelCode===r.code ? C.card : 'rgba(255,255,255,.6)',
+                        border:`1.5px solid ${cancelCode===r.code ? C.red : C.line}`,
+                        borderRadius:11, padding:'11px 13px', fontSize:13.5, fontWeight:600,
+                        color:C.text, cursor:'pointer', fontFamily:'inherit' }}>
+                      <span style={{ width:17, height:17, borderRadius:'50%', flexShrink:0,
+                        border:`2px solid ${cancelCode===r.code ? C.red : '#C6C6C9'}`,
+                        background: cancelCode===r.code ? C.red : 'transparent' }} />
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+                {cancelCode === 'other' && (
+                  <textarea value={cancelNote} onChange={e => setCancelNote(e.target.value.slice(0,300))} rows={2}
+                    placeholder="Tell the customer what happened…"
+                    style={{ ...input, padding:11, fontSize:13, resize:'none', marginBottom:10 }} />
+                )}
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={() => { setCancelOpen(false); setCancelCode(''); setCancelNote('') }}
+                    style={{ ...btnPrimary, flex:1, background:C.card, color:C.text2,
+                      border:`1.5px solid ${C.line}`, padding:12, fontSize:13 }}>Keep Job</button>
+                  <button onClick={cancelActiveJob} disabled={busy || !cancelCode}
+                    style={{ ...btnPrimary, flex:1, background:C.red, color:'#fff', padding:12, fontSize:13,
+                      opacity:(busy || !cancelCode) ? .5 : 1 }}>
+                    {busy ? '…' : 'Cancel Booking'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Verified */}
             {activeJob.payment_status==='verified' && (
               <div style={{ background:C.greenL, border:`1px solid ${C.green}`, borderRadius:14, padding:16, marginTop:10, textAlign:'center' }}>

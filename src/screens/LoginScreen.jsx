@@ -84,8 +84,16 @@ export default function LoginScreen({ setScreen, showToast }) {
   )
 
   return (
-    <div style={{ height:'100vh', background:'#F4F5F6', display:'flex', flexDirection:'column', maxWidth:430, margin:'0 auto', width:'100%' }}>
-      <div style={{ background:Y, padding:'40px 24px 28px', textAlign:'center' }}>
+    <div style={{ minHeight:'100dvh', background:'#F4F5F6', display:'flex', flexDirection:'column', maxWidth:430, margin:'0 auto', width:'100%', overflowY:'auto' }}>
+      <div style={{ background:Y, padding:'18px 20px 28px', textAlign:'center', position:'relative' }}>
+        {setScreen && (
+          <button onClick={() => setScreen('landing')}
+            style={{ position:'absolute', left:14, top:14, background:'rgba(0,0,0,.10)', border:'none',
+              borderRadius:9, padding:'7px 13px', fontSize:12.5, fontWeight:700, cursor:'pointer',
+              fontFamily:'inherit', color:'#1A1A1A' }}>
+            ← Back
+          </button>
+        )}
         <img src="/icon-192.png" alt="Kaam Ready" style={{ width:72, height:72, borderRadius:16, marginBottom:10, boxShadow:'0 4px 14px rgba(0,0,0,.2)' }} />
         <h1 style={{ fontSize:28, fontWeight:800 }}>Kaam Ready</h1>
         <p style={{ fontSize:13, color:'rgba(0,0,0,.6)', marginTop:4 }}>Worker Dashboard</p>

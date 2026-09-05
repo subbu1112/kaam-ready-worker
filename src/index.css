@@ -1,16 +1,89 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+/* The signed-in app is a fixed, non-scrolling phone shell; the public landing
+   page is an ordinary scrolling web page. `.kr-app-locked` is put on <html> by
+   App.jsx only while the app shell is mounted, so the landing page can scroll
+   on a desktop instead of being clipped by a global overflow:hidden. */
 html, body, #root {
-  height: 100%;
+  min-height: 100%;
   font-family: 'Inter', sans-serif;
   background: #F4F5F6;
   color: #1A1A1A;
-  overflow: hidden;
   -webkit-font-smoothing: antialiased;
+}
+html.kr-app-locked, html.kr-app-locked body, html.kr-app-locked #root {
+  height: 100%;
+  overflow: hidden;
 }
 ::-webkit-scrollbar { display: none; }
 input, select, textarea, button { font-family: inherit; }
 input::placeholder, textarea::placeholder { color: #B4B4B8; }
+img { max-width: 100%; }
+
+/* ── Responsive helpers ───────────────────────────────────────────────────
+   Mobile-first: everything is one column until there is room for more.      */
+
+/* Page-width container for the public site. */
+.kr-container { width: 100%; max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+@media (min-width: 768px) { .kr-container { padding: 0 32px; } }
+
+/* Section rhythm grows with the viewport. */
+.kr-section { padding: 44px 0; }
+@media (min-width: 768px)  { .kr-section { padding: 64px 0; } }
+@media (min-width: 1024px) { .kr-section { padding: 80px 0; } }
+
+/* Card grids: 1 col on phones, 2 on tablets, 3–4 on desktop. */
+.kr-grid   { display: grid; gap: 14px; grid-template-columns: 1fr; }
+.kr-grid-2 { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@media (min-width: 640px)  { .kr-grid { grid-template-columns: repeat(2, 1fr); } .kr-grid-2 { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .kr-grid { grid-template-columns: repeat(3, 1fr); gap: 18px; } }
+.kr-grid-4 { display: grid; gap: 12px; grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 1024px) { .kr-grid-4 { grid-template-columns: repeat(4, 1fr); gap: 18px; } }
+
+/* Hero: stacked on phones, text + panel side by side from tablet up. */
+.kr-hero { display: grid; gap: 28px; grid-template-columns: 1fr; align-items: center; }
+@media (min-width: 900px) { .kr-hero { grid-template-columns: 1.1fr .9fr; gap: 48px; } }
+
+.kr-h1 { font-size: 30px; line-height: 1.15; font-weight: 900; letter-spacing: -.5px; }
+@media (min-width: 768px)  { .kr-h1 { font-size: 42px; } }
+@media (min-width: 1024px) { .kr-h1 { font-size: 52px; } }
+.kr-h2 { font-size: 22px; line-height: 1.2; font-weight: 900; letter-spacing: -.3px; }
+@media (min-width: 768px) { .kr-h2 { font-size: 30px; } }
+.kr-lead { font-size: 15px; line-height: 1.65; }
+@media (min-width: 768px) { .kr-lead { font-size: 17px; } }
+
+/* Desktop-only / mobile-only. */
+.kr-desktop-only { display: none; }
+@media (min-width: 900px) { .kr-desktop-only { display: flex; } .kr-mobile-only { display: none !important; } }
+
+/* Buttons that sit side by side once there is room. */
+.kr-cta-row { display: flex; flex-direction: column; gap: 10px; }
+@media (min-width: 480px) { .kr-cta-row { flex-direction: row; } }
+
+/* ── Signed-in app shell ──────────────────────────────────────────────────
+   The app itself is a phone-shaped experience (bottom tab bar, one column).
+   On a desktop we present it as a deliberate centred device frame on a
+   backdrop rather than a stranded strip against a grey page.               */
+.kr-app-shell {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 430px;
+  margin: 0 auto;
+  background: #F4F5F6;
+  overflow: hidden;
+}
+@media (min-width: 900px) {
+  body { background: #E7E8EB; }
+  .kr-app-shell {
+    inset: 24px auto; left: 50%; transform: translateX(-50%);
+    height: calc(100vh - 48px);
+    border-radius: 22px;
+    border: 1px solid #DDDEE2;
+    box-shadow: 0 18px 60px rgba(16, 24, 40, .16);
+  }
+}
+
 @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
 @keyframes popIn { from{transform:scale(.8);opacity:0} to{transform:scale(1);opacity:1} }
 @keyframes slideUp { from{transform:translateY(12px);opacity:0} to{transform:translateY(0);opacity:1} }

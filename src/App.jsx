@@ -6,6 +6,7 @@ import { C } from './theme'
 import Toast   from './components/Toast'
 import TermsModal, { termsAccepted, acceptTerms } from './components/TermsModal'
 
+const LandingScreen    = lazy(() => import('./screens/LandingScreen'))
 const LoginScreen      = lazy(() => import('./screens/LoginScreen'))
 const OTPScreen        = lazy(() => import('./screens/OTPScreen'))
 const OnboardScreen    = lazy(() => import('./screens/OnboardScreen'))
@@ -69,23 +70,37 @@ function PageLoader() {
 }
 
 export default function App() {
-  const [screen,    setScreen]    = useState('login')
+  // Public home page first. The worker domain used to open straight on the
+  // sign-in form, so anyone arriving from search or an ad landed on a login
+  // box with no explanation of the offer.
+  const [screen,    setScreen]    = useState('landing')
   const [tab,       setTab]       = useState('home')
   const [user,      setUser]      = useState(null)
   const [profile,   setProfile]   = useState(null)
   const [toast,     setToast]     = useState(null)
   const [showTerms, setShowTerms] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
     sb.auth.getSession().then(({ data }) => {
       if (data.session?.user) { setUser(data.session.user); loadProfile(data.session.user.id) }
+      else setAuthChecked(true)
     })
     const { data: { subscription } } = sb.auth.onAuthStateChange((_e, session) => {
       if (session?.user) { setUser(session.user); loadProfile(session.user.id) }
-      else { setUser(null); setProfile(null); setScreen('login') }
+      // Signing out returns to the public page, not to a bare login form.
+      else { setUser(null); setProfile(null); setScreen('landing'); setAuthChecked(true) }
     })
     return () => subscription.unsubscribe()
   }, [])
+
+  // The signed-in shell is a fixed, non-scrolling phone layout; the landing
+  // page is a normal scrolling document. Only lock the page for the former.
+  useEffect(() => {
+    const locked = screen === 'main'
+    document.documentElement.classList.toggle('kr-app-locked', locked)
+    return () => document.documentElement.classList.remove('kr-app-locked')
+  }, [screen])
 
   async function logConsentOnce(uid) {
     try {
@@ -106,6 +121,10 @@ export default function App() {
                kyc_status,onboarding_done,upi_id,account_status,is_online,
                rating,total_jobs,trust_score,wallet_balance,avatar_url,
                aadhar_submitted,aadhar_verified,aadhar_front_url,aadhar_back_url,
+               aadhaar_front_url,aadhaar_back_url,selfie_video_url,
+               aadhaar_front_path,aadhaar_back_path,selfie_video_path,
+               aadhaar_front_submitted_at,aadhaar_back_submitted_at,selfie_video_submitted_at,
+               verification_submitted_at,kyc_rejection_reason,kyc_reviewed_at,kyc_resubmission_requested,
                pan_submitted,pan_verified,pan_front_url,pan_number,aadhaar_number,
                service_radius_km,working_hours_start,working_hours_end,
                referral_code,credit_balance,price_min,bank_account,bank_ifsc,bank_name,payout_method`)
@@ -118,24 +137,25 @@ export default function App() {
     } else {
       setScreen('onboard')
     }
+    setAuthChecked(true)
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(null), 2600) }
 
   const ctx = { user, profile, setProfile, setScreen, setTab, showToast, reloadProfile: () => user && loadProfile(user.id) }
 
+  // Hold the loader until we know whether there is a session, so a signed-in
+  // worker never sees the marketing page flash before their jobs screen.
+  if (!authChecked) return <PageLoader />
+
   return (
     <Suspense fallback={<PageLoader />}>
+      {screen === 'landing' && <><LandingScreen setScreen={setScreen} />{toast && <Toast msg={toast} />}</>}
       {screen === 'login'   && <><LoginScreen   {...ctx} />{toast && <Toast msg={toast} />}</>}
       {screen === 'otp'     && <><OTPScreen     {...ctx} />{toast && <Toast msg={toast} />}</>}
       {screen === 'onboard' && <><OnboardScreen {...ctx} />{toast && <Toast msg={toast} />}</>}
       {screen === 'main'    && (
-        <div style={{
-          position:'fixed', top:0, bottom:0, left:'50%', transform:'translateX(-50%)',
-          width:'100%', maxWidth:430,
-          display:'flex', flexDirection:'column',
-          background:C.page, overflow:'hidden',
-        }}>
+        <div className="kr-app-shell">
           {showTerms && <TermsModal onAccept={() => { acceptTerms(); setShowTerms(false) }} />}
           <TabErrorBoundary>
             {tab === 'home'          && <HomeScreen          {...ctx} />}

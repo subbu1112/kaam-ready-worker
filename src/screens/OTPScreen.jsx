@@ -74,7 +74,7 @@ export default function OTPScreen({ setScreen, showToast }) {
   }
 
   return (
-    <div style={{ height:'100vh', background:'#F4F5F6', maxWidth:430, margin:'0 auto', width:'100%', display:'flex', flexDirection:'column' }}>
+    <div style={{ minHeight:'100dvh', background:'#F4F5F6', maxWidth:430, margin:'0 auto', width:'100%', display:'flex', flexDirection:'column', overflowY:'auto' }}>
       <div style={{ background:Y, padding:'16px 24px 20px' }}>
         <button onClick={() => setScreen('login')} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer' }}>←</button>
         <h2 style={{ fontWeight:800, fontSize:20, marginTop:8 }}>Enter OTP</h2>

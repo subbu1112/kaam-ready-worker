@@ -3,6 +3,8 @@ import { sb } from '../lib/supabase'
 import AvatarUpload from '../components/AvatarUpload'
 import { loadSettings, SETTINGS_DEFAULTS } from '../lib/settings'
 import { getLang, setLang, LANGS, t } from '../i18n'
+import VerificationPanel from '../components/VerificationPanel'
+import { isFullyVerified, allDocsSubmitted, KYC_STATUS_LABEL } from '../lib/kyc'
 
 const Y='#F5C000', YD='#B8900A', YL='#FFF7DA', BK='#1A1A1A', GREEN='#0FA958'
 
@@ -66,13 +68,13 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
   const [contAddress,  setContAddress]  = useState(profile?.address || '')
   const [contSaving,   setContSaving]   = useState(false)
 
-  // KYC modal state
-  const [aadharFront,   setAadharFront]   = useState(null)
-  const [aadharBack,    setAadharBack]    = useState(null)
+  // Verification modal state. Document uploads live in VerificationPanel; only
+  // the ID numbers are edited here.
   const [panFront,      setPanFront]      = useState(null)
   const [aadhaarNumber, setAadhaarNumber] = useState(profile?.aadhaar_number || '')
   const [panNumber,     setPanNumber]     = useState(profile?.pan_number || '')
   const [kycSaving,     setKycSaving]     = useState(false)
+  const [kycLocal,      setKycLocal]      = useState({})   // optimistic doc state
 
   // Bank modal state
   const [upiId,        setUpiId]        = useState(profile?.upi_id || '')
@@ -100,38 +102,39 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
     setContSaving(false)
   }
 
-  async function uploadDoc(file, path) {
-    // Unique name per upload: storage's upsert path is rejected by RLS.
-    const uniquePath = `${user.id}/${Date.now()}-${path}`
-    const { error } = await sb.storage.from('kyc').upload(uniquePath, file)
+  // The kyc bucket is private, so a public URL would simply 404 for the admin.
+  // Store the path and hand out a signed URL for legacy readers.
+  async function uploadDoc(file, name) {
+    const uniquePath = `${user.id}/${Date.now()}-${name}`
+    const { error } = await sb.storage.from('kyc').upload(uniquePath, file, {
+      contentType: file.type || undefined,
+    })
     if (error) return null
-    const { data: { publicUrl } } = sb.storage.from('kyc').getPublicUrl(uniquePath)
-    return publicUrl
+    let url = null
+    try {
+      const { data } = await sb.storage.from('kyc').createSignedUrl(uniquePath, 60 * 60 * 24 * 7)
+      url = data?.signedUrl || null
+    } catch { /* the path alone is enough */ }
+    return { path: uniquePath, url }
   }
 
   async function saveKYC() {
-    if (!aadharFront || !aadharBack) { showToast('Upload both Aadhaar sides'); return }
     if (!aadhaarNumber.trim()) { showToast('Enter Aadhaar number'); return }
     setKycSaving(true)
-    const [frontUrl, backUrl, panUrl] = await Promise.all([
-      uploadDoc(aadharFront, 'aadhaar-front.jpg'),
-      uploadDoc(aadharBack, 'aadhaar-back.jpg'),
-      panFront ? uploadDoc(panFront, 'pan-front.jpg') : Promise.resolve(null),
-    ])
-    const updates = {
-      aadhar_submitted: true,
-      aadhar_front_url: frontUrl,
-      aadhar_back_url: backUrl,
-      aadhaar_number: aadhaarNumber.trim(),
-    }
-    if (panUrl) {
-      updates.pan_submitted = true
-      updates.pan_front_url = panUrl
+    const updates = { aadhaar_number: aadhaarNumber.trim() }
+    if (panFront) {
+      const pan = await uploadDoc(panFront, 'pan-front.jpg')
+      if (pan) {
+        updates.pan_submitted = true
+        updates.pan_front_url = pan.url
+        updates.pan_number = panNumber.trim() || null
+      } else { showToast('PAN upload failed'); setKycSaving(false); return }
+    } else if (panNumber.trim()) {
       updates.pan_number = panNumber.trim()
     }
     const { error } = await sb.from('workers').update(updates).eq('id', user.id)
-    if (error) showToast('KYC save failed')
-    else { showToast('KYC submitted ✓'); reloadProfile?.(); setModal(null) }
+    if (error) showToast('Save failed: ' + error.message)
+    else { showToast('Details saved ✓'); reloadProfile?.(); setModal(null) }
     setKycSaving(false)
   }
 
@@ -162,7 +165,7 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
     { ico:'🔔', label:'Notifications',      bg:'#F1F1F3', action:() => setTab && setTab('notifications') },
     { ico:'🏆', label:'Rewards & Tiers',    bg:'#FFF7DA', action:() => setTab && setTab('rewards') },
     { ico:'📞', label:'Contact Info',      bg:'#E7F7EE', action:() => setModal('contact') },
-    { ico:'🛡️', label:'KYC Documents',     bg:'#E8F0FE', action:() => setModal('kyc') },
+    { ico:'🛡️', label:'Identity Verification',     bg:'#E8F0FE', action:() => setModal('kyc') },
     { ico:'💳', label:'Payment & Bank',    bg:'#F1F1F3', action:() => setModal('bank') },
     { ico:'⚙️', label:'Settings',          bg:'#F1F1F3', action:() => setTab && setTab('settings') },
     { ico:'⭐', label:'My Ratings',        bg:'#FFF7DA', action:() => { setModal('ratings'); loadRatings() } },
@@ -186,23 +189,16 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
         </Modal>
       )}
 
-      {/* KYC Modal */}
+      {/* Identity verification modal */}
       {modal === 'kyc' && (
-        <Modal title="🛡️ KYC Documents" onClose={() => setModal(null)}>
-          {profile?.aadhar_verified && (
-            <div style={{ background:'#E7F7EE', borderRadius:10, padding:'10px 14px', marginBottom:14, border:'1px solid #0FA958' }}>
-              <p style={{ color:'#0FA958', fontWeight:700, fontSize:13 }}>✅ Aadhaar Verified</p>
-            </div>
-          )}
-          <p style={{ color:'#1A1A1A', fontWeight:700, fontSize:13, marginBottom:10 }}>Aadhaar Card *</p>
-          {[['Front Side', aadharFront, setAadharFront], ['Back Side', aadharBack, setAadharBack]].map(([lbl, val, set]) => (
-            <div key={lbl} style={{ marginBottom:12 }}>
-              <label style={{ fontSize:11, fontWeight:700, color:'#6B6B70', display:'block', marginBottom:6, textTransform:'uppercase' }}>{lbl}</label>
-              <input type="file" accept="image/*" onChange={e => set(e.target.files[0])}
-                style={{ width:'100%', color:'#6B6B70', fontSize:13 }} />
-              {val && <p style={{ fontSize:11, color:GREEN, marginTop:4 }}>✓ {val.name}</p>}
-            </div>
-          ))}
+        <Modal title="🛡️ Identity Verification" onClose={() => { setModal(null); reloadProfile?.() }}>
+          <VerificationPanel
+            worker={{ ...(profile || {}), ...kycLocal, id: user?.id }}
+            showToast={showToast}
+            onChange={patch => setKycLocal(prev => ({ ...prev, ...patch }))}
+            compact />
+
+          <div style={{ height:16 }} />
           <Field label="Aadhaar Number" value={aadhaarNumber} onChange={setAadhaarNumber} placeholder="XXXX XXXX XXXX" />
 
           <p style={{ color:'#1A1A1A', fontWeight:700, fontSize:13, marginBottom:10, marginTop:6 }}>PAN Card (Optional)</p>
@@ -216,7 +212,7 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
 
           <button onClick={saveKYC} disabled={kycSaving}
             style={{ width:'100%', background:Y, border:'none', borderRadius:14, padding:15, fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'inherit', opacity:kycSaving?0.6:1 }}>
-            {kycSaving ? 'Uploading...' : 'Submit KYC ✓'}
+            {kycSaving ? 'Saving...' : 'Save ID details ✓'}
           </button>
         </Modal>
       )}
@@ -377,13 +373,37 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
           </span>
         </div>
 
-        {/* KYC warning */}
-        {!profile?.aadhar_submitted && (
-          <div style={{ background:'#FFF7DA', borderRadius:10, padding:'10px 14px', marginTop:14, border:'1px solid #f59e0b' }}
-            onClick={() => setModal('kyc')}>
-            <p style={{ color:'#f59e0b', fontWeight:700, fontSize:12 }}>⚠️ KYC pending — tap to submit Aadhaar</p>
-          </div>
-        )}
+        {/* Verification banner */}
+        {(() => {
+          const w = { ...(profile || {}), ...kycLocal }
+          if (isFullyVerified(w)) {
+            return (
+              <div style={{ background:'#E7F7EE', borderRadius:10, padding:'10px 14px', marginTop:14, border:'1px solid '+GREEN }}>
+                <p style={{ color:GREEN, fontWeight:700, fontSize:12 }}>✅ Verified — you can be assigned jobs</p>
+              </div>
+            )
+          }
+          const st = w.kyc_status || 'pending'
+          const missing = !allDocsSubmitted(w)
+          const msg = missing
+            ? '⚠️ Verification incomplete — tap to upload Aadhaar & selfie video'
+            : st === 'rejected'
+              ? '✕ Verification rejected — tap to see why and resubmit'
+              : st === 'resubmit_required'
+                ? '↻ Admin asked you to resubmit — tap to fix'
+                : '⏳ Documents submitted — waiting for admin approval'
+          const tone = st === 'rejected' ? '#E5484D' : '#f59e0b'
+          return (
+            <div onClick={() => setModal('kyc')}
+              style={{ background:'#FFF7DA', borderRadius:10, padding:'10px 14px', marginTop:14,
+                border:'1px solid '+tone, cursor:'pointer' }}>
+              <p style={{ color:tone, fontWeight:700, fontSize:12 }}>{msg}</p>
+              {w.kyc_rejection_reason && (st === 'rejected' || st === 'resubmit_required') && (
+                <p style={{ color:'#6B6B70', fontSize:11, marginTop:4 }}>{w.kyc_rejection_reason}</p>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {/* Stats row */}
