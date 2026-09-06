@@ -14,7 +14,7 @@ const PROFILE_GROUP = ['profile', 'settings', 'notifications', 'history']
 export default function TabBar({ tab, setTab }) {
   return (
     <div style={{ background:C.card, borderTop:`1px solid ${C.line}`, display:'flex',
-      padding:'6px 0 10px', flexShrink:0, boxShadow:'0 -2px 12px rgba(16,24,40,.05)' }}>
+      padding:'6px 0 10px', paddingBottom:'calc(10px + env(safe-area-inset-bottom, 0px))', flexShrink:0, boxShadow:'0 -2px 12px rgba(16,24,40,.05)' }}>
       {TABS.map(tb => {
         const active = tab === tb.id || (tb.id === 'profile' && PROFILE_GROUP.includes(tab))
         return (

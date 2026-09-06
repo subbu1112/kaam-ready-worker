@@ -67,6 +67,11 @@ img { max-width: 100%; }
    backdrop rather than a stranded strip against a grey page.               */
 .kr-app-shell {
   position: fixed; inset: 0;
+  /* Android 15+ draws the app behind the status bar and the gesture bar
+     (edge-to-edge is enforced, the old setStatusBarColor opt-out is ignored). */
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
   display: flex; flex-direction: column;
   width: 100%; max-width: 430px;
   margin: 0 auto;
