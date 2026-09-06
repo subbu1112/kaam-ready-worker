@@ -49,7 +49,7 @@ export default function ProfileScreen({ user, profile, showToast, reloadProfile,
   useEffect(() => { loadSettings().then(setCfg) }, [])
   const supTel = '+916362869636'
   const supWa  = '916362869636'
-  const supMail= cfg.support_email || 'support@kaamready.in'
+  const supMail= cfg.support_email || 'thekaamready@gmail.com'
 
   async function loadRatings() {
     setRatingsLoading(true)

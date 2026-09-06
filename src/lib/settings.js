@@ -6,7 +6,7 @@ export const SETTINGS_DEFAULTS = {
   commission_pct:   '10',
   upi_handle:       'kaamready@ybl',
   support_phone:    '6362869636',
-  support_email:    'support@kaamready.in',
+  support_email:    'thekaamready@gmail.com',
   support_whatsapp: '916362869636',
 }
 

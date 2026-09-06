@@ -438,7 +438,7 @@ export default function LandingScreen({ setScreen }) {
                 <a href="tel:+916362869636" style={{ color: Y, fontWeight: 700 }}>+91 63628 69636</a>
               </p>
               <p style={{ fontSize: 13.5, marginBottom: 6 }}>
-                <a href="mailto:support@kaamready.in" style={{ color: Y, fontWeight: 700 }}>support@kaamready.in</a>
+                <a href="mailto:thekaamready@gmail.com" style={{ color: Y, fontWeight: 700 }}>thekaamready@gmail.com</a>
               </p>
               <p style={{ fontSize: 13.5 }}>
                 Looking to book a worker instead?{' '}

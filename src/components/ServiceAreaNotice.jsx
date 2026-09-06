@@ -35,9 +35,9 @@ export default function ServiceAreaNotice({ compact = false }) {
           {place ? `It looks like you're browsing from ${place}. ` : ''}
           You're welcome to look around — bookings open when we reach your city.
           Tell us where to go next at{' '}
-          <a href="mailto:support@kaamready.in?subject=Bring%20KaamReady%20to%20my%20city"
+          <a href="mailto:thekaamready@gmail.com?subject=Bring%20KaamReady%20to%20my%20city"
             style={{ color: Y, fontWeight: 700, textDecoration: 'underline' }}>
-            support@kaamready.in
+            thekaamready@gmail.com
           </a>.
         </p>
         <button onClick={() => setDismiss(true)} aria-label="Dismiss"
