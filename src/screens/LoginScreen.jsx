@@ -94,9 +94,11 @@ export default function LoginScreen({ setScreen, showToast }) {
             ← Back
           </button>
         )}
-        <img src="/icon-192.png" alt="Kaam Ready" style={{ width:72, height:72, borderRadius:16, marginBottom:10, boxShadow:'0 4px 14px rgba(0,0,0,.2)' }} />
-        <h1 style={{ fontSize:28, fontWeight:800 }}>Kaam Ready</h1>
-        <p style={{ fontSize:13, color:'rgba(0,0,0,.6)', marginTop:4 }}>Worker Dashboard</p>
+        {/* The sign-in screen has room for the full lockup, so use it here
+            rather than the square launcher tile. */}
+        <img src="/logo-worker.png" alt="KaamReady Worker"
+          style={{ width:'min(260px, 68vw)', height:'auto', marginBottom:6 }} />
+        <p style={{ fontSize:13, color:'rgba(0,0,0,.6)', marginTop:2 }}>Worker Dashboard</p>
       </div>
 
       <div style={{ display:'flex', margin:'20px 20px 0', background:'#FFFFFF', border:'1px solid #E9E9EB', borderRadius:12, padding:4, gap:4 }}>

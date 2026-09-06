@@ -11,20 +11,71 @@
   "orientation": "portrait",
   "lang": "en-IN",
   "dir": "ltr",
-  "categories": ["business", "productivity"],
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "shortcuts": [
-    { "name": "Go online", "short_name": "Online", "url": "/", "description": "Start receiving jobs" },
-    { "name": "My earnings", "short_name": "Earnings", "url": "/", "description": "View your earnings" }
+    {
+      "name": "Go online",
+      "short_name": "Online",
+      "url": "/",
+      "description": "Start receiving jobs"
+    },
+    {
+      "name": "My earnings",
+      "short_name": "Earnings",
+      "url": "/",
+      "description": "View your earnings"
+    }
   ],
   "screenshots": [
-    { "src": "/ws-online.png", "sizes": "1080x2348", "type": "image/png", "form_factor": "narrow", "label": "Get verified jobs near you" },
-    { "src": "/ws-earn.png", "sizes": "1080x2348", "type": "image/png", "form_factor": "narrow", "label": "Withdraw earnings to UPI anytime" },
-    { "src": "/ws-tier.png", "sizes": "1080x2348", "type": "image/png", "form_factor": "narrow", "label": "Grow your tier and ratings" }
+    {
+      "src": "/ws-online.png",
+      "sizes": "1080x2348",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Get verified jobs near you"
+    },
+    {
+      "src": "/ws-earn.png",
+      "sizes": "1080x2348",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Withdraw earnings to UPI anytime"
+    },
+    {
+      "src": "/ws-tier.png",
+      "sizes": "1080x2348",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Grow your tier and ratings"
+    }
   ]
 }
